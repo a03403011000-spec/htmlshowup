@@ -148,7 +148,7 @@ button.green:hover { background: #94e2d5; }
   border-radius: 8px;
   padding: 4px 0;
   z-index: 999;
-  min-width: 180px;
+  min-width: 200px; /* ★ 稍微加宽以容纳两个 Word 选项 */
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 .export-menu.show { display: block; }
@@ -158,6 +158,13 @@ button.green:hover { background: #94e2d5; }
   background: transparent; color: #cdd6f4; font-size: 13px;
 }
 .export-menu button:hover { background: #45475a; }
+
+/* ★ 菜单分割线 */
+.export-menu .menu-divider {
+  height: 1px;
+  background: #45475a;
+  margin: 4px 0;
+}
 
 /* 底栏 */
 .bottombar {
@@ -215,7 +222,10 @@ button.green:hover { background: #94e2d5; }
       <div class="export-menu" id="exportMenu">
         <button onclick="doExport('html')">🌐 HTML (.html)</button>
         <button onclick="doExport('pdf')">📄 PDF (.pdf)</button>
-        <button onclick="doExport('docx')">📝 Word (.docx)</button>
+        <!-- ★ 新增：DOC 与 DOCX 分开列出，中间加分割线 -->
+        <button onclick="doExport('doc')">📝 Word 兼容版 (.doc)</button>
+        <button onclick="doExport('docx')">📝 Word 现代版 (.docx)</button>
+        <div class="menu-divider"></div>
         <button onclick="doExport('excel')">📊 Excel (.xlsx)</button>
         <button onclick="doExport('ppt')">📽️ PPT (.ppt)</button>
       </div>
@@ -328,7 +338,8 @@ function switchTab(tab) {
 }
 
 function updateStatus() {
-  document.getElementById('statusInfo').textContent = `${currentLang.toUpperCase()} | ${editor.value.length} 字符`;
+  document.getElementById('statusInfo').textContent =
+    `${currentLang.toUpperCase()} | ${editor.value.length} 字符`;
 }
 
 editor.addEventListener('input', () => { code[currentLang] = editor.value; updateStatus(); });
@@ -374,18 +385,18 @@ function clearAll() {
 }
 
 function copyCode() {
-  navigator.clipboard.writeText(editor.value).then(() => showMsg('已复制 ✓')).catch(() => {
-    editor.select(); document.execCommand('copy'); showMsg('已复制 ✓');
-  });
+  navigator.clipboard.writeText(editor.value)
+    .then(() => showMsg('已复制 ✓'))
+    .catch(() => { editor.select(); document.execCommand('copy'); showMsg('已复制 ✓'); });
 }
 
 function showMsg(text) {
   const old = document.getElementById('_toast'); if (old) old.remove();
   const d = document.createElement('div'); d.id = '_toast'; d.textContent = text;
   Object.assign(d.style, {
-    position:'fixed',top:'16px',left:'50%',transform:'translateX(-50%)',
-    padding:'10px 24px',background:'#a6e3a1',color:'#1e1e2e',borderRadius:'8px',
-    fontWeight:'600',fontSize:'14px',zIndex:'9999',boxShadow:'0 4px 16px rgba(0,0,0,0.3)'
+    position:'fixed', top:'16px', left:'50%', transform:'translateX(-50%)',
+    padding:'10px 24px', background:'#a6e3a1', color:'#1e1e2e', borderRadius:'8px',
+    fontWeight:'600', fontSize:'14px', zIndex:'9999', boxShadow:'0 4px 16px rgba(0,0,0,0.3)'
   });
   document.body.appendChild(d);
   setTimeout(() => d.remove(), 2500);
@@ -399,25 +410,33 @@ function hideLoading() { document.getElementById('overlay').classList.remove('sh
 
 function toggleMenu() { document.getElementById('exportMenu').classList.toggle('show'); }
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.export-wrap')) document.getElementById('exportMenu').classList.remove('show');
+  if (!e.target.closest('.export-wrap'))
+    document.getElementById('exportMenu').classList.remove('show');
 });
 
 function getProjectName() {
   return document.getElementById('projectName').value.trim() || '我的项目';
 }
 
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
 
 // ===================== 导出路由 =====================
 function doExport(type) {
   document.getElementById('exportMenu').classList.remove('show');
   code[currentLang] = editor.value;
   switch(type) {
-    case 'html': exportHTML(); break;
-    case 'pdf': exportPDF(); break;
-    case 'docx': exportDOCX(); break;
+    case 'html':  exportHTML();  break;
+    case 'pdf':   exportPDF();   break;
+    case 'doc':   exportDOC();   break;  // ★ 新增 DOC 路由
+    case 'docx':  exportDOCX();  break;
     case 'excel': exportExcel(); break;
-    case 'ppt': exportPPT(); break;
+    case 'ppt':   exportPPT();   break;
   }
 }
 
@@ -438,7 +457,6 @@ function exportPDF() {
     const usableW = pw - margin * 2;
     const imgH = (canvas.height * usableW) / canvas.width;
 
-    // 分页
     let srcY = 0;
     const usableH = ph - margin * 2;
     const pageHeightPx = (usableH / imgH) * canvas.height;
@@ -464,7 +482,270 @@ function exportPDF() {
   }).catch(() => { hideLoading(); showMsg('PDF 导出失败'); });
 }
 
-// ===================== 导出 DOCX（重点） =====================
+// ===================== ★ 导出 DOC（HTML-in-Word 兼容格式） =====================
+/**
+ * .doc 本质是让 Word 用 HTML 模式打开的 MIME 文档。
+ * 优点：无需额外库，兼容 Word 2003+，文件体积小。
+ * 包含：封面、预览文本、表格数据、源代码，全部以 Word XML 样式排版。
+ */
+function exportDOC() {
+  showLoading('正在生成 Word 兼容版 (.doc)...');
+
+  setTimeout(() => {
+    try {
+      const name    = getProjectName();
+      const nowStr  = new Date().toLocaleString('zh-CN');
+      const tableData  = extractTablesFromPreview();
+      const previewTxt = extractTextFromPreview();
+
+      // ---- 构建表格 HTML ----
+      let tablesHTML = '';
+      if (tableData.length > 0) {
+        tableData.forEach((tbl, idx) => {
+          tablesHTML += `<h2>表格 ${idx + 1}</h2>`;
+          tablesHTML += '<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:11pt;">';
+          tbl.forEach((row, ri) => {
+            tablesHTML += '<tr>';
+            row.forEach(cell => {
+              if (ri === 0) {
+                tablesHTML += `<th style="background:#4A56E2;color:#fff;padding:8px 12px;">${esc(cell)}</th>`;
+              } else {
+                tablesHTML += `<td style="padding:6px 12px;border:1px solid #ccc;">${esc(cell)}</td>`;
+              }
+            });
+            tablesHTML += '</tr>';
+          });
+          tablesHTML += '</table><br>';
+        });
+      }
+
+      // ---- 构建代码块 HTML ----
+      let codeHTML = '';
+      const codeMap = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
+      for (const [lang, label] of Object.entries(codeMap)) {
+        if (code[lang].trim()) {
+          codeHTML += `<h2>${label} 代码</h2>`;
+          codeHTML += `<pre style="background:#f5f5f5;padding:12px;font-family:Consolas,monospace;
+                        font-size:9pt;border:1px solid #ddd;border-radius:4px;
+                        white-space:pre-wrap;word-break:break-all;">${esc(code[lang])}</pre>`;
+        }
+      }
+
+      // ---- 组装完整 Word HTML 文档 ----
+      // mso-* 属性是 Microsoft Office 专用排版指令，确保在 Word 中正确分页和样式
+      const docContent = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <title>${esc(name)}</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    /* 页面设置：A4 纸，页边距 2.54cm */
+    @page WordSection1 {
+      size: 21cm 29.7cm;
+      margin: 2.54cm 3.17cm 2.54cm 3.17cm;
+      mso-header-margin: 1.5cm;
+      mso-footer-margin: 1.75cm;
+      mso-paper-source: 0;
+    }
+    body {
+      font-family: "Microsoft YaHei", "SimSun", sans-serif;
+      font-size: 12pt;
+      color: #333;
+      div { mso-element: para-border-div; }
+    }
+    /* 标题样式 */
+    h1 {
+      font-size: 22pt;
+      color: #4A56E2;
+      font-weight: bold;
+      margin: 24pt 0 12pt;
+      border-bottom: 2px solid #4A56E2;
+      padding-bottom: 6pt;
+      mso-style-name: "标题 1";
+    }
+    h2 {
+      font-size: 14pt;
+      color: #333;
+      font-weight: bold;
+      margin: 18pt 0 8pt;
+      mso-style-name: "标题 2";
+    }
+    h3 {
+      font-size: 12pt;
+      color: #555;
+      font-weight: bold;
+      margin: 12pt 0 6pt;
+    }
+    p {
+      font-size: 11pt;
+      line-height: 1.8;
+      margin: 6pt 0;
+      text-align: justify;
+    }
+    /* 封面样式 */
+    .cover {
+      text-align: center;
+      padding: 80pt 0 60pt;
+      page-break-after: always;  /* Word 分页 */
+      mso-break-type: section-break;
+    }
+    .cover-title {
+      font-size: 36pt;
+      font-weight: bold;
+      color: #4A56E2;
+      display: block;
+      margin-bottom: 16pt;
+    }
+    .cover-sub {
+      font-size: 16pt;
+      color: #888;
+      display: block;
+      margin-bottom: 10pt;
+    }
+    .cover-date {
+      font-size: 11pt;
+      color: #aaa;
+    }
+    /* 信息框 */
+    .info-box {
+      background: #f0f4ff;
+      border-left: 4px solid #4A56E2;
+      padding: 10pt 14pt;
+      margin: 12pt 0;
+      font-size: 11pt;
+    }
+    /* 表格 */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10pt 0;
+      font-size: 10.5pt;
+    }
+    th {
+      background: #4A56E2;
+      color: #fff;
+      padding: 8px 12px;
+      font-weight: bold;
+      text-align: left;
+    }
+    td {
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      color: #444;
+    }
+    tr:nth-child(even) td { background: #f8f8ff; }
+    /* 代码块 */
+    pre {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 10pt 12pt;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9pt;
+      color: #2d2d2d;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+      margin: 8pt 0;
+    }
+    /* 页脚 */
+    .footer-note {
+      font-size: 9pt;
+      color: #aaa;
+      text-align: center;
+      margin-top: 40pt;
+      border-top: 1px solid #eee;
+      padding-top: 8pt;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 封面 -->
+  <div class="cover">
+    <span class="cover-title">${esc(name)}</span>
+    <span class="cover-sub">代码编辑器导出文档</span>
+    <span class="cover-date">导出时间：${nowStr}</span>
+  </div>
+
+  <!-- 第一章：项目概述 -->
+  <h1>第一章 项目概述</h1>
+  <div class="info-box">
+    本文档由「代码编辑器」自动生成，包含项目「${esc(name)}」的完整代码内容及相关数据摘要。
+  </div>
+  <p>文档生成时间：${nowStr}。以下内容分为代码部分、数据表格和源代码三个主要章节。</p>
+  <table>
+    <tr>
+      <th>项目</th><th>内容</th>
+    </tr>
+    <tr><td>项目名称</td><td>${esc(name)}</td></tr>
+    <tr><td>HTML 代码</td><td>${code.html.length} 字符</td></tr>
+    <tr><td>CSS 代码</td><td>${code.css.length} 字符</td></tr>
+    <tr><td>JavaScript 代码</td><td>${code.js.length} 字符</td></tr>
+    <tr><td>检测到的表格数</td><td>${tableData.length} 个</td></tr>
+  </table>
+
+  <!-- 第二章：页面文本内容 -->
+  ${previewTxt.trim() ? `
+  <h1>第二章 页面文本内容</h1>
+  <p>${esc(previewTxt.substring(0, 3000)).replace(/\n/g, '</p><p>')}</p>
+  ` : ''}
+
+  <!-- 第三章：数据表格 -->
+  ${tableData.length > 0 ? `
+  <h1>${previewTxt.trim() ? '第三章' : '第二章'} 数据表格</h1>
+  <p>页面中共检测到 ${tableData.length} 个表格，以下为提取内容：</p>
+  ${tablesHTML}
+  ` : ''}
+
+  <!-- 源代码章节 -->
+  <h1>${
+    (previewTxt.trim() ? 1 : 0) + (tableData.length > 0 ? 1 : 0) + 2
+  === 2 ? '第二章' :
+    (previewTxt.trim() ? 1 : 0) + (tableData.length > 0 ? 1 : 0) + 2
+  === 3 ? '第三章' : '第四章'} 源代码</h1>
+  <p>以下为编辑器中的完整源代码内容。</p>
+  ${codeHTML}
+
+  <!-- 附录 -->
+  <h1>附录</h1>
+  <p>本文档由代码编辑器自动生成。</p>
+  <p>项目名称：${esc(name)}</p>
+  <p>生成时间：${nowStr}</p>
+
+  <div class="footer-note">— 代码编辑器自动导出 · ${nowStr} —</div>
+
+</body>
+</html>`;
+
+      // ★ 关键：使用 Word 专用 MIME 类型触发 Word 打开
+      const blob = new Blob(
+        ['\ufeff' + docContent],   // BOM 头确保 UTF-8 编码被 Word 正确识别
+        { type: 'application/msword' }
+      );
+      saveAs(blob, `${name}.doc`);
+      hideLoading();
+      showMsg('Word (.doc) 已导出 ✓');
+
+    } catch (err) {
+      console.error('DOC 导出错误:', err);
+      hideLoading();
+      showMsg('DOC 导出失败: ' + err.message);
+    }
+  }, 200);
+}
+
+// ===================== 导出 DOCX（原有逻辑，保持不变） =====================
 async function exportDOCX() {
   showLoading('正在生成 Word 文档...');
 
@@ -514,9 +795,7 @@ async function exportDOCX() {
         spacing: { after: 400 },
         children: [new TextRun({ text: `导出时间：${now}`, size: 20, color: 'AAAAAA', font: 'Microsoft YaHei' })]
       }),
-      new Paragraph({
-        children: [new TextRun({ text: '', break: 1 })]
-      })
+      new Paragraph({ children: [new TextRun({ text: '', break: 1 })] })
     );
 
     // == 第一章：项目概述 ==
@@ -528,12 +807,9 @@ async function exportDOCX() {
     );
 
     // == 第二章：预览效果 ==
-    children.push(
-      createHeading('第二章 预览效果', HeadingLevel.HEADING_1)
-    );
+    children.push(createHeading('第二章 预览效果', HeadingLevel.HEADING_1));
 
     if (screenshotBase64) {
-      // 计算图片在文档中的尺寸（最大宽度约 600px / 15cm）
       const maxW = 580;
       const ratio = imgHeight / imgWidth;
       const drawW = Math.min(maxW, imgWidth);
@@ -557,14 +833,12 @@ async function exportDOCX() {
       children.push(createBody('（预览截图生成失败，请在浏览器中运行预览查看效果）'));
     }
 
-    // 预览文本内容
     if (previewText.trim()) {
       children.push(
         createHeading('2.1 页面文本内容', HeadingLevel.HEADING_2),
         createBody(previewText.substring(0, 3000))
       );
     }
-
     children.push(createEmpty());
 
     // == 第三章：数据表格 ==
@@ -575,9 +849,7 @@ async function exportDOCX() {
       );
 
       tableData.forEach((tbl, idx) => {
-        children.push(
-          createHeading(`3.${idx + 1} 表格 ${idx + 1}`, HeadingLevel.HEADING_2)
-        );
+        children.push(createHeading(`3.${idx + 1} 表格 ${idx + 1}`, HeadingLevel.HEADING_2));
 
         if (tbl.length > 0) {
           const docTable = new Table({
@@ -610,7 +882,7 @@ async function exportDOCX() {
       });
     }
 
-    // == 第四章：源代码 ==
+    // == 源代码章节 ==
     children.push(
       createHeading(tableData.length > 0 ? '第四章 源代码' : '第三章 源代码', HeadingLevel.HEADING_1),
       createBody('以下为编辑器中的完整源代码内容。')
@@ -618,39 +890,26 @@ async function exportDOCX() {
 
     const codeMap = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
     const chapterBase = tableData.length > 0 ? 4 : 3;
-
     let secIdx = 1;
+
     for (const [lang, label] of Object.entries(codeMap)) {
       if (code[lang].trim()) {
-        children.push(
-          createHeading(`${chapterBase}.${secIdx} ${label} 代码`, HeadingLevel.HEADING_2)
-        );
-
-        // 代码块：灰底等宽字体，逐行添加
-        const lines = code[lang].split('\n');
-        lines.forEach(line => {
+        children.push(createHeading(`${chapterBase}.${secIdx} ${label} 代码`, HeadingLevel.HEADING_2));
+        code[lang].split('\n').forEach(line => {
           children.push(
             new Paragraph({
               spacing: { before: 0, after: 0, line: 276 },
               shading: { type: ShadingType.SOLID, color: 'F5F5F5' },
-              children: [
-                new TextRun({
-                  text: line || ' ',
-                  font: 'Consolas',
-                  size: 18,
-                  color: '2D2D2D'
-                })
-              ]
+              children: [new TextRun({ text: line || ' ', font: 'Consolas', size: 18, color: '2D2D2D' })]
             })
           );
         });
-
         children.push(createEmpty());
         secIdx++;
       }
     }
 
-    // == 结尾 ==
+    // == 附录 ==
     children.push(
       createHeading('附录', HeadingLevel.HEADING_1),
       createBody(`本文档由代码编辑器自动生成。`),
@@ -668,16 +927,12 @@ async function exportDOCX() {
       description: '由代码编辑器自动导出的文档',
       styles: {
         default: {
-          document: {
-            run: { font: 'Microsoft YaHei', size: 22 }
-          }
+          document: { run: { font: 'Microsoft YaHei', size: 22 } }
         }
       },
       sections: [{
         properties: {
-          page: {
-            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 }
-          }
+          page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }
         },
         children: children
       }]
@@ -700,17 +955,18 @@ function createHeading(text, level) {
   return new docx.Paragraph({
     heading: level,
     spacing: { before: 360, after: 160 },
-    children: [new docx.TextRun({ text, bold: true, font: 'Microsoft YaHei', color: level === docx.HeadingLevel.HEADING_1 ? '4A56E2' : '333333' })]
+    children: [new docx.TextRun({
+      text, bold: true, font: 'Microsoft YaHei',
+      color: level === docx.HeadingLevel.HEADING_1 ? '4A56E2' : '333333'
+    })]
   });
 }
-
 function createBody(text) {
   return new docx.Paragraph({
     spacing: { before: 80, after: 80 },
     children: [new docx.TextRun({ text, font: 'Microsoft YaHei', size: 22, color: '444444' })]
   });
 }
-
 function createEmpty() {
   return new docx.Paragraph({ children: [] });
 }
@@ -729,11 +985,10 @@ function exportExcel() {
       });
     }
 
-    // 代码 sheet
     const codeRows = [['语言', '代码内容']];
     if (code.html.trim()) codeRows.push(['HTML', code.html]);
-    if (code.css.trim()) codeRows.push(['CSS', code.css]);
-    if (code.js.trim()) codeRows.push(['JavaScript', code.js]);
+    if (code.css.trim())  codeRows.push(['CSS', code.css]);
+    if (code.js.trim())   codeRows.push(['JavaScript', code.js]);
     const ws = XLSX.utils.aoa_to_sheet(codeRows);
     ws['!cols'] = [{ wch: 12 }, { wch: 120 }];
     XLSX.utils.book_append_sheet(wb, ws, '源代码');
@@ -764,7 +1019,7 @@ function exportPPT() {
     </style></head><body>
       <div class="slide" style="background:linear-gradient(135deg,#667eea,#764ba2)">
         <h1 style="color:#fff;font-size:40pt">${esc(getProjectName())}</h1>
-        <p style="color:rgba(255,255,255,0.8)">${now()}</p>
+        <p style="color:rgba(255,255,255,0.8)">${new Date().toLocaleString('zh-CN')}</p>
       </div>
       <div class="slide">
         <h1>预览效果</h1>
@@ -781,8 +1036,6 @@ function exportPPT() {
     hideLoading();
     showMsg('PPT 已导出 ✓');
   }).catch(() => { hideLoading(); showMsg('PPT 导出失败'); });
-
-  function now() { return new Date().toLocaleString('zh-CN'); }
 }
 
 // ===================== 公共工具 =====================
