@@ -1,815 +1,246 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代码编辑器 & 多格式导出工具</title>
-
-    <!-- 外部库 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-
-    <style>
-        /* ========== CSS 变量 & 重置 ========== */
-        :root {
-            --bg-primary: #0f0f1a;
-            --bg-secondary: #1a1a2e;
-            --bg-tertiary: #16213e;
-            --bg-card: #1e1e36;
-            --accent-primary: #6c63ff;
-            --accent-secondary: #ff6584;
-            --accent-tertiary: #43e97b;
-            --text-primary: #e8e8f0;
-            --text-secondary: #a0a0c0;
-            --text-muted: #6a6a8e;
-            --border-color: #2a2a4a;
-            --shadow-glow: 0 0 30px rgba(108, 99, 255, 0.15);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        /* ========== 背景动画 ========== */
-        .bg-animation {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            overflow: hidden;
-            pointer-events: none;
-        }
-
-        .bg-animation .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.3;
-            animation: float 20s infinite ease-in-out;
-        }
-
-        .bg-animation .orb:nth-child(1) {
-            width: 400px; height: 400px;
-            background: var(--accent-primary);
-            top: -100px; left: -100px;
-            animation-delay: 0s;
-        }
-
-        .bg-animation .orb:nth-child(2) {
-            width: 350px; height: 350px;
-            background: var(--accent-secondary);
-            bottom: -80px; right: -80px;
-            animation-delay: -7s;
-        }
-
-        .bg-animation .orb:nth-child(3) {
-            width: 300px; height: 300px;
-            background: var(--accent-tertiary);
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            animation-delay: -14s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(50px, -50px) scale(1.1); }
-            50% { transform: translate(-30px, 30px) scale(0.95); }
-            75% { transform: translate(40px, 40px) scale(1.05); }
-        }
-
-        /* ========== 主容器 ========== */
-        .app-container {
-            position: relative;
-            z-index: 1;
-            max-width: 1500px;
-            margin: 0 auto;
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        /* ========== 头部 ========== */
-        .app-header {
-            text-align: center;
-            padding: 30px 0 20px;
-            position: relative;
-        }
-
-        .app-header h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: -0.5px;
-        }
-
-        .app-header p {
-            color: var(--text-secondary);
-            margin-top: 8px;
-            font-size: 0.95rem;
-        }
-
-        /* ========== 工具栏 ========== */
-        .toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 16px 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            margin-bottom: 16px;
-            backdrop-filter: blur(10px);
-        }
-
-        .toolbar-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .lang-selector {
-            display: flex;
-            background: var(--bg-primary);
-            border-radius: var(--radius-sm);
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        .lang-btn {
-            padding: 8px 16px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .lang-btn.active {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        .lang-btn:hover:not(.active) {
-            background: rgba(108, 99, 255, 0.15);
-            color: var(--text-primary);
-        }
-
-        /* ========== 按钮样式 ========== */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 9px 18px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            white-space: nowrap;
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-glow);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent-primary), #8b7aff);
-            border-color: var(--accent-primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            box-shadow: 0 4px 20px rgba(108, 99, 255, 0.4);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #2ecc71, var(--accent-tertiary));
-            border-color: #2ecc71;
-            color: white;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, var(--accent-secondary), #ff8fa3);
-            border-color: var(--accent-secondary);
-            color: white;
-        }
-
-        .btn-export {
-            background: var(--bg-card);
-            border-color: var(--border-color);
-        }
-
-        .btn-export:hover {
-            border-color: var(--accent-primary);
-            background: rgba(108, 99, 255, 0.1);
-        }
-
-        .btn-icon {
-            font-size: 1rem;
-        }
-
-        /* ========== 导出下拉 ========== */
-        .export-dropdown {
-            position: relative;
-        }
-
-        .export-menu {
-            position: absolute;
-            top: calc(100% + 8px);
-            right: 0;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 8px;
-            min-width: 200px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-            z-index: 100;
-            display: none;
-            animation: slideDown 0.2s ease;
-        }
-
-        .export-menu.show {
-            display: block;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .export-menu-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border: none;
-            background: transparent;
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            cursor: pointer;
-            border-radius: var(--radius-sm);
-            transition: var(--transition);
-            width: 100%;
-            text-align: left;
-        }
-
-        .export-menu-item:hover {
-            background: rgba(108, 99, 255, 0.15);
-        }
-
-        .export-menu-item .icon {
-            font-size: 1.2rem;
-            width: 28px;
-            text-align: center;
-        }
-
-        .export-menu-item .label {
-            flex: 1;
-        }
-
-        .export-menu-item .badge {
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: rgba(108, 99, 255, 0.2);
-            color: var(--accent-primary);
-        }
-
-        /* ========== 主编辑区 ========== */
-        .editor-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            height: calc(100vh - 260px);
-            min-height: 500px;
-        }
-
-        .panel {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .panel:hover {
-            border-color: rgba(108, 99, 255, 0.3);
-        }
-
-        .panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 18px;
-            background: var(--bg-tertiary);
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-
-        .panel-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: var(--text-primary);
-        }
-
-        .panel-title .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent-tertiary);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        .panel-body {
-            flex: 1;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* ========== 代码编辑器 ========== */
-        .editor-wrapper {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-        }
-
-        .line-numbers {
-            padding: 16px 8px 16px 12px;
-            background: rgba(0, 0, 0, 0.2);
-            color: var(--text-muted);
-            font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-            font-size: 0.85rem;
-            line-height: 1.65;
-            text-align: right;
-            user-select: none;
-            overflow: hidden;
-            min-width: 48px;
-            flex-shrink: 0;
-        }
-
-        .code-editor {
-            flex: 1;
-            width: 100%;
-            height: 100%;
-            padding: 16px;
-            background: transparent;
-            color: var(--text-primary);
-            border: none;
-            outline: none;
-            resize: none;
-            font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-            font-size: 0.85rem;
-            line-height: 1.65;
-            tab-size: 2;
-            white-space: pre;
-            overflow: auto;
-        }
-
-        .code-editor::placeholder {
-            color: var(--text-muted);
-        }
-
-        .code-editor::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        .code-editor::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .code-editor::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        .code-editor::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
-
-        /* ========== 预览区 ========== */
-        .preview-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: white;
-        }
-
-        .preview-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-muted);
-            gap: 12px;
-        }
-
-        .preview-placeholder .icon {
-            font-size: 3rem;
-            opacity: 0.3;
-        }
-
-        /* ========== 状态栏 ========== */
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            margin-top: 16px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .status-bar .status-left,
-        .status-bar .status-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent-tertiary);
-        }
-
-        /* ========== Toast 通知 ========== */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .toast {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
-            min-width: 280px;
-        }
-
-        .toast.success { border-left: 3px solid var(--accent-tertiary); }
-        .toast.error { border-left: 3px solid var(--accent-secondary); }
-        .toast.info { border-left: 3px solid var(--accent-primary); }
-
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateX(50px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        @keyframes toastOut {
-            from { opacity: 1; transform: translateX(0); }
-            to { opacity: 0; transform: translateX(50px); }
-        }
-
-        /* ========== 模板选择器 ========== */
-        .template-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            margin-bottom: 16px;
-            overflow-x: auto;
-        }
-
-        .template-bar-label {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            font-weight: 600;
-        }
-
-        .template-chip {
-            padding: 6px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            background: var(--bg-card);
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: var(--transition);
-            white-space: nowrap;
-        }
-
-        .template-chip:hover {
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-            background: rgba(108, 99, 255, 0.1);
-        }
-
-        /* ========== 加载遮罩 ========== */
-        .loading-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(15, 15, 26, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9998;
-            backdrop-filter: blur(4px);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-        }
-
-        .loading-overlay.active {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        .loading-spinner {
-            width: 48px;
-            height: 48px;
-            border: 3px solid var(--border-color);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ========== 响应式 ========== */
-        @media (max-width: 900px) {
-            .editor-layout {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-
-            .panel {
-                min-height: 350px;
-            }
-
-            .toolbar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .toolbar-left, .toolbar-right {
-                justify-content: center;
-            }
-
-            .app-header h1 {
-                font-size: 1.6rem;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代码编辑器 - 预览与导出</title>
+
+<!-- 导出依赖 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: -apple-system, "Microsoft YaHei", sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== 顶栏 ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+
+.topbar h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #cba6f7;
+}
+
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+button {
+  padding: 6px 14px;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  background: #313244;
+  color: #cdd6f4;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+button:hover { background: #45475a; }
+button.primary { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; font-weight: 600; }
+button.primary:hover { background: #74c7ec; }
+button.green { background: #a6e3a1; color: #1e1e2e; border-color: #a6e3a1; font-weight: 600; }
+button.green:hover { background: #94e2d5; }
+
+/* ===== 标签栏 ===== */
+.tabs {
+  display: flex;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #6c7086;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tab:hover { color: #cdd6f4; }
+.tab.active {
+  color: #89b4fa;
+  border-bottom-color: #89b4fa;
+  background: #1e1e2e;
+}
+
+/* ===== 主区域 ===== */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 编辑器 */
+.editor-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid #313244;
+  min-width: 0;
+}
+
+.editor-pane textarea {
+  flex: 1;
+  width: 100%;
+  padding: 14px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+/* 预览 */
+.preview-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #fff;
+}
+
+.preview-label {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #6c7086;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+
+.preview-pane iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+/* ===== 导出菜单 ===== */
+.export-wrap { position: relative; }
+.export-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  padding: 4px 0;
+  z-index: 999;
+  min-width: 170px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.export-menu.show { display: block; }
+.export-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #cdd6f4;
+  font-size: 13px;
+}
+.export-menu button:hover { background: #45475a; }
+
+/* ===== 底栏 ===== */
+.bottombar {
+  padding: 4px 16px;
+  font-size: 12px;
+  color: #6c7086;
+  background: #181825;
+  border-top: 1px solid #313244;
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+/* 响应式 */
+@media (max-width: 700px) {
+  .main { flex-direction: column; }
+  .editor-pane { border-right: none; border-bottom: 2px solid #313244; flex: 1; }
+  .preview-pane { flex: 1; }
+}
+</style>
 </head>
 <body>
 
-    <!-- 背景动画 -->
-    <div class="bg-animation">
-        <div class="orb"></div>
-        <div class="orb"></div>
-        <div class="orb"></div>
+<!-- 顶栏 -->
+<div class="topbar">
+  <h1>⚡ 代码编辑器</h1>
+  <div class="btn-group">
+    <button class="primary" onclick="runPreview()">▶ 运行</button>
+    <button onclick="clearAll()">清空</button>
+    <button onclick="copyCode()">复制</button>
+    <div class="export-wrap">
+      <button class="green" onclick="toggleMenu()">📦 导出 ▾</button>
+      <div class="export-menu" id="exportMenu">
+        <button onclick="doExport('html')">💾 导出 HTML</button>
+        <button onclick="doExport('pdf')">📄 导出 PDF</button>
+        <button onclick="doExport('word')">📝 导出 Word</button>
+        <button onclick="doExport('excel')">📊 导出 Excel</button>
+        <button onclick="doExport('ppt')">📽️ 导出 PPT</button>
+      </div>
     </div>
+  </div>
+</div>
 
-    <!-- Toast 通知容器 -->
-    <div class="toast-container" id="toastContainer"></div>
+<!-- 标签栏 -->
+<div class="tabs">
+  <div class="tab active" data-lang="html" onclick="switchTab(this)">HTML</div>
+  <div class="tab" data-lang="css" onclick="switchTab(this)">CSS</div>
+  <div class="tab" data-lang="js" onclick="switchTab(this)">JavaScript</div>
+</div>
 
-    <!-- 加载遮罩 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
+<!-- 主区域 -->
+<div class="main">
+  <div class="editor-pane">
+    <textarea id="editor" spellcheck="false" placeholder="在这里写代码，然后点击「运行」查看效果..."></textarea>
+  </div>
+  <div class="preview-pane">
+    <div class="preview-label">预览区域（点击「运行」刷新）</div>
+    <iframe id="preview"></iframe>
+  </div>
+</div>
 
-    <!-- 主容器 -->
-    <div class="app-container">
+<!-- 底栏 -->
+<div class="bottombar">
+  <span id="statusInfo">HTML | 0 字符</span>
+  <span>UTF-8</span>
+</div>
 
-        <!-- 头部 -->
-        <header class="app-header">
-            <h1>⚡ 代码编辑器 & 多格式导出</h1>
-            <p>编写代码 · 实时预览 · 一键导出为 Excel / Word / PPT / PDF / HTML</p>
-        </header>
-
-        <!-- 模板栏 -->
-        <div class="template-bar">
-            <span class="template-bar-label">📌 快速模板：</span>
-            <button class="template-chip" onclick="loadTemplate('hello')">Hello World</button>
-            <button class="template-chip" onclick="loadTemplate('form')">表单页面</button>
-            <button class="template-chip" onclick="loadTemplate('card')">卡片布局</button>
-            <button class="template-chip" onclick="loadTemplate('dashboard')">仪表盘</button>
-            <button class="template-chip" onclick="loadTemplate('table')">数据表格</button>
-            <button class="template-chip" onclick="loadTemplate('animation')">CSS 动画</button>
-        </div>
-
-        <!-- 工具栏 -->
-        <div class="toolbar">
-            <div class="toolbar-left">
-                <div class="lang-selector">
-                    <button class="lang-btn active" data-lang="html" onclick="switchLang(this)">HTML</button>
-                    <button class="lang-btn" data-lang="css" onclick="switchLang(this)">CSS</button>
-                    <button class="lang-btn" data-lang="js" onclick="switchLang(this)">JavaScript</button>
-                </div>
-                <button class="btn btn-primary" onclick="runPreview()">
-                    <span class="btn-icon">▶</span> 运行预览
-                </button>
-                <button class="btn" onclick="formatCode()">
-                    <span class="btn-icon">✨</span> 格式化
-                </button>
-                <button class="btn btn-danger" onclick="clearEditor()">
-                    <span class="btn-icon">🗑</span> 清空
-                </button>
-            </div>
-            <div class="toolbar-right">
-                <button class="btn" onclick="copyCode()">
-                    <span class="btn-icon">📋</span> 复制
-                </button>
-                <div class="export-dropdown">
-                    <button class="btn btn-success" onclick="toggleExportMenu()">
-                        <span class="btn-icon">📦</span> 导出 ▾
-                    </button>
-                    <div class="export-menu" id="exportMenu">
-                        <button class="export-menu-item" onclick="exportHTML()">
-                            <span class="icon">🌐</span>
-                            <span class="label">HTML 文件</span>
-                            <span class="badge">.html</span>
-                        </button>
-                        <button class="export-menu-item" onclick="exportPDF()">
-                            <span class="icon">📄</span>
-                            <span class="label">PDF 文档</span>
-                            <span class="badge">.pdf</span>
-                        </button>
-                        <button class="export-menu-item" onclick="exportWord()">
-                            <span class="icon">📝</span>
-                            <span class="label">Word 文档</span>
-                            <span class="badge">.docx</span>
-                        </button>
-                        <button class="export-menu-item" onclick="exportExcel()">
-                            <span class="icon">📊</span>
-                            <span class="label">Excel 表格</span>
-                            <span class="badge">.xlsx</span>
-                        </button>
-                        <button class="export-menu-item" onclick="exportPPT()">
-                            <span class="icon">📽</span>
-                            <span class="label">PPT 演示</span>
-                            <span class="badge">.pptx</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 编辑器布局 -->
-        <div class="editor-layout">
-            <!-- 代码面板 -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-title">
-                        <span class="dot"></span>
-                        <span id="editorLabel">编辑器 — HTML</span>
-                    </div>
-                    <span style="font-size:0.78rem; color:var(--text-muted)" id="charCount">0 字符</span>
-                </div>
-                <div class="panel-body">
-                    <div class="editor-wrapper">
-                        <div class="line-numbers" id="lineNumbers">1</div>
-                        <textarea
-                            class="code-editor"
-                            id="codeEditor"
-                            placeholder="在此输入代码..."
-                            spellcheck="false"
-                            oninput="onEditorInput()"
-                            onscroll="syncScroll()"
-                            onkeydown="handleTab(event)"
-                        ></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 预览面板 -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-title">
-                        <span class="dot" style="background: var(--accent-secondary)"></span>
-                        <span>实时预览</span>
-                    </div>
-                    <button class="btn" style="padding:5px 12px; font-size:0.78rem" onclick="refreshPreview()">
-                        🔄 刷新
-                    </button>
-                </div>
-                <div class="panel-body">
-                    <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
-                </div>
-            </div>
-        </div>
-
-        <!-- 状态栏 -->
-        <div class="status-bar">
-            <div class="status-left">
-                <div class="status-item">
-                    <span class="status-dot"></span>
-                    <span>就绪</span>
-                </div>
-                <div class="status-item" id="statusLang">HTML</div>
-            </div>
-            <div class="status-right">
-                <div class="status-item" id="statusLines">行: 1</div>
-                <div class="status-item" id="statusSize">0 B</div>
-                <div class="status-item">UTF-8</div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // ==================== 状态管理 ====================
-        const state = {
-            html: '',
-            css: '',
-            js: '',
-            currentLang: 'html',
-            autoPreview: true
-        };
-
-        const editor = document.getElementById('codeEditor');
-        const previewFrame = document.getElementById('previewFrame');
-        const lineNumbers = document.getElementById('lineNumbers');
-
-        // ==================== 模板数据 ====================
-        const templates = {
-            hello: `<!DOCTYPE html>
-<html lang="zh-CN">
+<script>
+// ========== 状态 ==========
+const code = {
+  html: `<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8">
   <style>
     body {
       display: flex;
@@ -817,593 +248,406 @@
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      font-family: sans-serif;
     }
-    .card {
-      background: white;
-      padding: 60px 80px;
-      border-radius: 20px;
+    .box {
+      background: #fff;
+      padding: 50px 70px;
+      border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       text-align: center;
     }
-    h1 {
-      font-size: 3rem;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    h1 { color: #333; margin-bottom: 8px; }
+    p { color: #777; }
+    button {
+      margin-top: 20px;
+      padding: 10px 30px;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
     }
-    p { color: #666; font-size: 1.2rem; margin-top: 10px; }
+    button:hover { background: #5a6fd6; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>🚀 Hello World!</h1>
-    <p>欢迎使用代码编辑器</p>
+  <div class="box">
+    <h1>Hello World 🎉</h1>
+    <p>编辑左侧代码，点击运行查看效果</p>
+    <button onclick="alert('按钮可以用！')">点我试试</button>
   </div>
 </body>
 </html>`,
+  css: `/* 在这里写 CSS，会注入到 HTML 的 <head> 中 */
 
-            form: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh;
-      background: #f0f2f5;
-      font-family: 'Segoe UI', sans-serif;
+body {
+  font-family: sans-serif;
+}`,
+  js: `// 在这里写 JavaScript，会注入到 HTML 的 <body> 末尾
+
+console.log("Hello from JS editor!");`
+};
+
+let currentLang = 'html';
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+
+// 初始化
+editor.value = code.html;
+updateStatus();
+// 自动运行一次
+setTimeout(runPreview, 100);
+
+// ========== 标签切换 ==========
+function switchTab(tab) {
+  // 保存当前
+  code[currentLang] = editor.value;
+  // 切换
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  currentLang = tab.dataset.lang;
+  editor.value = code[currentLang];
+  updateStatus();
+}
+
+function updateStatus() {
+  const len = editor.value.length;
+  document.getElementById('statusInfo').textContent = `${currentLang.toUpperCase()} | ${len} 字符`;
+}
+
+editor.addEventListener('input', () => {
+  code[currentLang] = editor.value;
+  updateStatus();
+});
+
+// Tab 键支持
+editor.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = editor.selectionStart;
+    editor.value = editor.value.substring(0, s) + '  ' + editor.value.substring(editor.selectionEnd);
+    editor.selectionStart = editor.selectionEnd = s + 2;
+    code[currentLang] = editor.value;
+  }
+});
+
+// ========== 运行预览 ==========
+function runPreview() {
+  code[currentLang] = editor.value;
+  const fullHTML = buildHTML();
+  const doc = preview.contentDocument || preview.contentWindow.document;
+  doc.open();
+  doc.write(fullHTML);
+  doc.close();
+}
+
+function buildHTML() {
+  let html = code.html.trim();
+
+  // 如果是完整 HTML 文档
+  if (html.match(/<html[\s>]/i)) {
+    // 注入 CSS
+    if (code.css.trim()) {
+      const style = `<style>${code.css}</style>`;
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', style + '</head>');
+      } else {
+        html = style + html;
+      }
     }
-    .form-card {
-      background: white; padding: 40px; border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.1); width: 420px;
+    // 注入 JS
+    if (code.js.trim()) {
+      const script = `<script>${code.js}<\/script>`;
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', script + '</body>');
+      } else {
+        html += script;
+      }
     }
-    h2 { margin-bottom: 24px; color: #333; }
-    .form-group { margin-bottom: 18px; }
-    label { display: block; margin-bottom: 6px; font-weight: 600; color: #555; font-size: 0.9rem; }
-    input, select, textarea {
-      width: 100%; padding: 10px 14px; border: 2px solid #e0e0e0;
-      border-radius: 8px; font-size: 0.95rem; transition: border-color 0.3s;
+    return html;
+  }
+
+  // 不是完整文档，拼接
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>${code.css}</style></head>
+<body>${html}<script>${code.js}<\/script></body></html>`;
+}
+
+// ========== 工具按钮 ==========
+function clearAll() {
+  if (!confirm('确定清空所有内容？')) return;
+  code.html = '';
+  code.css = '';
+  code.js = '';
+  editor.value = '';
+  updateStatus();
+  const doc = preview.contentDocument || preview.contentWindow.document;
+  doc.open(); doc.write(''); doc.close();
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(editor.value).then(() => {
+    showMsg('已复制到剪贴板 ✓');
+  }).catch(() => {
+    editor.select();
+    document.execCommand('copy');
+    showMsg('已复制 ✓');
+  });
+}
+
+function showMsg(text) {
+  const old = document.getElementById('_toast');
+  if (old) old.remove();
+  const d = document.createElement('div');
+  d.id = '_toast';
+  d.textContent = text;
+  Object.assign(d.style, {
+    position:'fixed', top:'16px', left:'50%', transform:'translateX(-50%)',
+    padding:'10px 24px', background:'#a6e3a1', color:'#1e1e2e', borderRadius:'8px',
+    fontWeight:'600', fontSize:'14px', zIndex:'9999', boxShadow:'0 4px 16px rgba(0,0,0,0.3)'
+  });
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 2000);
+}
+
+// ========== 导出菜单 ==========
+function toggleMenu() {
+  document.getElementById('exportMenu').classList.toggle('show');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.export-wrap')) {
+    document.getElementById('exportMenu').classList.remove('show');
+  }
+});
+
+// ========== 导出功能 ==========
+function doExport(type) {
+  document.getElementById('exportMenu').classList.remove('show');
+  code[currentLang] = editor.value;
+
+  switch(type) {
+    case 'html': exportAsHTML(); break;
+    case 'pdf':  exportAsPDF(); break;
+    case 'word': exportAsWord(); break;
+    case 'excel': exportAsExcel(); break;
+    case 'ppt':  exportAsPPT(); break;
+  }
+}
+
+// ---- HTML ----
+function exportAsHTML() {
+  const content = buildHTML();
+  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  saveAs(blob, 'page.html');
+  showMsg('HTML 已导出 ✓');
+}
+
+// ---- PDF ----
+function exportAsPDF() {
+  showMsg('正在生成 PDF...');
+
+  // 创建临时 iframe 来渲染
+  const tmpFrame = document.createElement('iframe');
+  tmpFrame.style.cssText = 'position:fixed;left:-9999px;width:1200px;height:900px;border:none;';
+  document.body.appendChild(tmpFrame);
+
+  const doc = tmpFrame.contentDocument;
+  doc.open();
+  doc.write(buildHTML());
+  doc.close();
+
+  tmpFrame.onload = () => {
+    setTimeout(() => {
+      html2canvas(doc.body, {
+        scale: 2,
+        useCORS: true,
+        width: 1200,
+        height: Math.max(doc.body.scrollHeight, 900),
+        backgroundColor: '#ffffff'
+      }).then(canvas => {
+        const { jsPDF } = window.jspdf;
+        const imgData = canvas.toDataURL('image/png');
+        const pdfW = 210; // A4 mm
+        const pdfH = (canvas.height * pdfW) / canvas.width;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, Math.min(pdfH, 297));
+
+        // 如果内容超过一页
+        if (pdfH > 297) {
+          let y = -297;
+          while (Math.abs(y) < pdfH) {
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, y, pdfW, pdfH);
+            y -= 297;
+          }
+        }
+
+        pdf.save('page.pdf');
+        document.body.removeChild(tmpFrame);
+        showMsg('PDF 已导出 ✓');
+      }).catch(() => {
+        document.body.removeChild(tmpFrame);
+        showMsg('PDF 导出失败，请重试');
+      });
+    }, 500);
+  };
+}
+
+// ---- Word (.doc via HTML) ----
+function exportAsWord() {
+  const htmlContent = buildHTML();
+
+  // 用 HTML 格式生成 .doc（Word 可以打开 HTML）
+  const wordContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8">
+    <style>
+      @page { size: A4; margin: 2cm; }
+      body { font-family: SimSun, serif; font-size: 12pt; }
+      pre { background: #f5f5f5; padding: 12px; border: 1px solid #ddd; border-radius: 4px;
+            font-family: Consolas, monospace; font-size: 10pt; white-space: pre-wrap; word-wrap: break-word; }
+      h1 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+      .section { margin-bottom: 20px; }
+      .label { font-weight: bold; color: #555; margin-bottom: 4px; }
+    </style>
+    </head><body>
+      <h1>代码导出文档</h1>
+      <p style="color:#888;">导出时间：${new Date().toLocaleString('zh-CN')}</p>
+      ${code.html.trim() ? `<div class="section"><div class="label">HTML 代码：</div><pre>${escapeHtml(code.html)}</pre></div>` : ''}
+      ${code.css.trim() ? `<div class="section"><div class="label">CSS 代码：</div><pre>${escapeHtml(code.css)}</pre></div>` : ''}
+      ${code.js.trim() ? `<div class="section"><div class="label">JavaScript 代码：</div><pre>${escapeHtml(code.js)}</pre></div>` : ''}
+      <div class="section"><div class="label">预览效果（HTML 源码）：</div><pre>${escapeHtml(htmlContent)}</pre></div>
+    </body></html>`;
+
+  const blob = new Blob(['\ufeff' + wordContent], { type: 'application/msword' });
+  saveAs(blob, 'code-export.doc');
+  showMsg('Word 已导出 ✓');
+}
+
+// ---- Excel ----
+function exportAsExcel() {
+  // 提取预览中的表格数据，如果没有表格则导出代码文本
+  const tmpFrame = document.createElement('iframe');
+  tmpFrame.style.cssText = 'position:fixed;left:-9999px;width:800px;height:600px;';
+  document.body.appendChild(tmpFrame);
+  const doc = tmpFrame.contentDocument;
+  doc.open(); doc.write(buildHTML()); doc.close();
+
+  setTimeout(() => {
+    const tables = doc.querySelectorAll('table');
+    const wb = XLSX.utils.book_new();
+
+    if (tables.length > 0) {
+      // 导出页面中的表格
+      tables.forEach((table, i) => {
+        const ws = XLSX.utils.table_to_sheet(table);
+        XLSX.utils.book_append_sheet(wb, ws, `表格${i + 1}`);
+      });
+    } else {
+      // 没有表格，把代码作为文本导出
+      const data = [
+        ['类型', '代码内容'],
+        ['HTML', code.html],
+        ['CSS', code.css],
+        ['JavaScript', code.js]
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [{ wch: 12 }, { wch: 100 }];
+      XLSX.utils.book_append_sheet(wb, ws, '代码');
+
+      // 提取页面文本内容
+      const textContent = doc.body.innerText.trim();
+      if (textContent) {
+        const lines = textContent.split('\n').map(line => [line]);
+        const ws2 = XLSX.utils.aoa_to_sheet([['页面文本内容'], ...lines]);
+        ws2['!cols'] = [{ wch: 100 }];
+        XLSX.utils.book_append_sheet(wb, ws2, '页面内容');
+      }
     }
-    input:focus, select:focus, textarea:focus {
-      outline: none; border-color: #667eea;
-    }
-    .btn {
-      width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white; border: none; border-radius: 8px; font-size: 1rem;
-      font-weight: 600; cursor: pointer; transition: transform 0.2s;
-    }
-    .btn:hover { transform: translateY(-2px); }
-  </style>
-</head>
-<body>
-  <div class="form-card">
-    <h2>📋 用户注册</h2>
-    <div class="form-group">
-      <label>用户名</label>
-      <input type="text" placeholder="请输入用户名">
-    </div>
-    <div class="form-group">
-      <label>邮箱</label>
-      <input type="email" placeholder="请输入邮箱地址">
-    </div>
-    <div class="form-group">
-      <label>角色</label>
-      <select>
-        <option>开发者</option>
-        <option>设计师</option>
-        <option>产品经理</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>简介</label>
-      <textarea rows="3" placeholder="简单介绍一下自己"></textarea>
-    </div>
-    <button class="btn" onclick="alert('注册成功！')">提交注册</button>
-  </div>
+
+    XLSX.writeFile(wb, 'export.xlsx');
+    document.body.removeChild(tmpFrame);
+    showMsg('Excel 已导出 ✓');
+  }, 300);
+}
+
+// ---- PPT (简易 HTML 方案) ----
+function exportAsPPT() {
+  showMsg('正在生成 PPT...');
+
+  // 先截图预览内容
+  const tmpFrame = document.createElement('iframe');
+  tmpFrame.style.cssText = 'position:fixed;left:-9999px;width:1280px;height:720px;border:none;';
+  document.body.appendChild(tmpFrame);
+  const doc = tmpFrame.contentDocument;
+  doc.open(); doc.write(buildHTML()); doc.close();
+
+  tmpFrame.onload = () => {
+    setTimeout(() => {
+      html2canvas(doc.body, {
+        scale: 2,
+        width: 1280,
+        height: 720,
+        backgroundColor: '#ffffff'
+      }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+
+        // 生成简易 PPT（用 SVG + HTML 嵌入方案）
+        // 这里用 HTML 格式的 .pptx 替代方案
+        const pptHTML = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office"
+                xmlns:p="urn:schemas-microsoft-com:office:powerpoint"
+                xmlns="http://www.w3.org/TR/REC-html40">
+          <head><meta charset="UTF-8">
+          <xml><o:DocumentProperties><o:Slides>2</o:Slides></o:DocumentProperties></xml>
+          <style>
+            @page { size: 25.4cm 19.05cm; margin: 0; }
+            .slide { page-break-after: always; width: 25.4cm; height: 19.05cm;
+                     display: flex; flex-direction: column; justify-content: center;
+                     align-items: center; padding: 2cm; }
+            h1 { font-size: 36pt; color: #333; margin-bottom: 20px; }
+            p { font-size: 16pt; color: #666; }
+            pre { font-size: 9pt; background: #f5f5f5; padding: 16px;
+                  border-radius: 8px; max-width: 100%; overflow: hidden;
+                  font-family: Consolas, monospace; white-space: pre-wrap; }
+            img { max-width: 90%; max-height: 70%; object-fit: contain; }
+          </style>
+          </head><body>
+            <div class="slide" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+              <h1 style="color:#fff;">代码预览</h1>
+              <p style="color:rgba(255,255,255,0.8);">${new Date().toLocaleString('zh-CN')}</p>
+            </div>
+            <div class="slide">
+              <h1>预览截图</h1>
+              <img src="${imgData}" />
+            </div>
+            <div class="slide">
+              <h1 style="font-size:24pt;align-self:flex-start;">HTML 代码</h1>
+              <pre>${escapeHtml(code.html.substring(0, 2000))}</pre>
+            </div>
+          </body></html>`;
+
+        const blob = new Blob(['\ufeff' + pptHTML], { type: 'application/vnd.ms-powerpoint' });
+        saveAs(blob, 'slides.ppt');
+        document.body.removeChild(tmpFrame);
+        showMsg('PPT 已导出 ✓');
+      }).catch(() => {
+        document.body.removeChild(tmpFrame);
+        showMsg('PPT 导出失败');
+      });
+    }, 500);
+  };
+}
+
+// ========== 工具函数 ==========
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
 </body>
-</html>`,
-
-            card: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #1a1a2e; padding: 40px;
-      font-family: 'Segoe UI', sans-serif;
-    }
-    h1 { text-align: center; color: white; margin-bottom: 30px; }
-    .grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px; max-width: 1000px; margin: 0 auto;
-    }
-    .card {
-      background: #16213e; border-radius: 16px; padding: 30px;
-      border: 1px solid #2a2a4a; transition: all 0.3s;
-    }
-    .card:hover { transform: translateY(-8px); border-color: #6c63ff; box-shadow: 0 12px 40px rgba(108,99,255,0.2); }
-    .card-icon { font-size: 2.5rem; margin-bottom: 16px; }
-    .card h3 { color: #e8e8f0; margin-bottom: 10px; }
-    .card p { color: #a0a0c0; line-height: 1.6; font-size: 0.92rem; }
-    .tag { display: inline-block; padding: 4px 12px; background: rgba(108,99,255,0.15); color: #6c63ff; border-radius: 20px; font-size: 0.78rem; margin-top: 14px; }
-  </style>
-</head>
-<body>
-  <h1>🎨 项目展示</h1>
-  <div class="grid">
-    <div class="card">
-      <div class="card-icon">🚀</div>
-      <h3>高性能引擎</h3>
-      <p>基于 WebAssembly 的高性能计算引擎，提供毫秒级响应速度。</p>
-      <span class="tag">性能优化</span>
-    </div>
-    <div class="card">
-      <div class="card-icon">🎯</div>
-      <h3>智能分析</h3>
-      <p>AI 驱动的数据分析平台，自动发现数据中的关键模式和趋势。</p>
-      <span class="tag">AI / ML</span>
-    </div>
-    <div class="card">
-      <div class="card-icon">🔒</div>
-      <h3>安全防护</h3>
-      <p>端到端加密通信方案，确保数据传输和存储的绝对安全。</p>
-      <span class="tag">安全</span>
-    </div>
-  </div>
-</body>
-</html>`,
-
-            dashboard: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f1a; color: #e8e8f0; font-family: 'Segoe UI', sans-serif; padding: 24px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .header h1 { font-size: 1.5rem; }
-    .header span { color: #a0a0c0; font-size: 0.9rem; }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; }
-    .stat-card .label { color: #a0a0c0; font-size: 0.82rem; margin-bottom: 8px; }
-    .stat-card .value { font-size: 1.8rem; font-weight: 800; }
-    .stat-card .change { font-size: 0.8rem; margin-top: 6px; }
-    .stat-card .change.up { color: #43e97b; }
-    .stat-card .change.down { color: #ff6584; }
-    .chart-area { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-    .chart-area h3 { margin-bottom: 16px; font-size: 1rem; }
-    .bar-chart { display: flex; align-items: flex-end; gap: 12px; height: 160px; }
-    .bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .bar { width: 100%; border-radius: 6px 6px 0 0; transition: height 1s ease; }
-    .bar-label { font-size: 0.75rem; color: #a0a0c0; }
-    .table-area { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; }
-    .table-area h3 { margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #2a2a4a; font-size: 0.88rem; }
-    th { color: #a0a0c0; font-weight: 600; }
-    .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; }
-    .badge-green { background: rgba(67,233,123,0.15); color: #43e97b; }
-    .badge-yellow { background: rgba(255,193,7,0.15); color: #ffc107; }
-    .badge-red { background: rgba(255,101,132,0.15); color: #ff6584; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>📊 数据仪表盘</h1>
-    <span>最后更新: 2026-03-02</span>
-  </div>
-  <div class="stats">
-    <div class="stat-card">
-      <div class="label">总用户数</div>
-      <div class="value" style="color:#6c63ff">24,521</div>
-      <div class="change up">↑ 12.5%</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">活跃用户</div>
-      <div class="value" style="color:#43e97b">8,432</div>
-      <div class="change up">↑ 8.2%</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">总收入</div>
-      <div class="value" style="color:#ffc107">¥1.2M</div>
-      <div class="change up">↑ 23.1%</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">跳出率</div>
-      <div class="value" style="color:#ff6584">32.1%</div>
-      <div class="change down">↓ 3.2%</div>
-    </div>
-  </div>
-  <div class="chart-area">
-    <h3>📈 月度趋势</h3>
-    <div class="bar-chart">
-      <div class="bar-wrapper"><div class="bar" style="height:60%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">1月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:45%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">2月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:75%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">3月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:55%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">4月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:85%;background:linear-gradient(180deg,#43e97b,#38f9d7)"></div><div class="bar-label">5月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:70%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">6月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:90%;background:linear-gradient(180deg,#43e97b,#38f9d7)"></div><div class="bar-label">7月</div></div>
-      <div class="bar-wrapper"><div class="bar" style="height:65%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">8月</div></div>
-    </div>
-  </div>
-  <div class="table-area">
-    <h3>📋 最近订单</h3>
-    <table>
-      <thead><tr><th>订单号</th><th>客户</th><th>金额</th><th>状态</th></tr></thead>
-      <tbody>
-        <tr><td>#20261001</td><td>张三</td><td>¥2,340</td><td><span class="badge badge-green">已完成</span></td></tr>
-        <tr><td>#20261002</td><td>李四</td><td>¥5,120</td><td><span class="badge badge-yellow">处理中</span></td></tr>
-        <tr><td>#20261003</td><td>王五</td><td>¥890</td><td><span class="badge badge-green">已完成</span></td></tr>
-        <tr><td>#20261004</td><td>赵六</td><td>¥3,670</td><td><span class="badge badge-red">已取消</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`,
-
-            table: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; padding: 40px; }
-    .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); overflow: hidden; }
-    .table-header { padding: 24px 30px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-    .table-header h2 { font-size: 1.3rem; color: #333; }
-    .search-box { padding: 8px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.9rem; width: 240px; }
-    .search-box:focus { outline: none; border-color: #667eea; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #f8f9fa; padding: 14px 20px; text-align: left; font-size: 0.82rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; font-size: 0.92rem; color: #444; }
-    tr:hover td { background: #f8f9ff; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.9rem; color: white; font-weight: 700; }
-    .user-cell { display: flex; align-items: center; gap: 12px; }
-    .status { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
-    .active { background: #e8f5e9; color: #2e7d32; }
-    .inactive { background: #fce4ec; color: #c62828; }
-    .pending { background: #fff3e0; color: #e65100; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="table-header">
-      <h2>👥 用户管理</h2>
-      <input class="search-box" placeholder="🔍 搜索用户...">
-    </div>
-    <table>
-      <thead>
-        <tr><th>用户</th><th>邮箱</th><th>角色</th><th>状态</th><th>注册日期</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><div class="user-cell"><div class="avatar" style="background:#667eea">张</div>张伟</div></td>
-          <td>zhang@example.com</td><td>管理员</td>
-          <td><span class="status active">活跃</span></td><td>2025-12-01</td>
-        </tr>
-        <tr>
-          <td><div class="user-cell"><div class="avatar" style="background:#43e97b">李</div>李娜</div></td>
-          <td>li@example.com</td><td>编辑</td>
-          <td><span class="status active">活跃</span></td><td>2025-12-15</td>
-        </tr>
-        <tr>
-          <td><div class="user-cell"><div class="avatar" style="background:#ff6584">王</div>王磊</div></td>
-          <td>wang@example.com</td><td>用户</td>
-          <td><span class="status pending">待审核</span></td><td>2026-01-08</td>
-        </tr>
-        <tr>
-          <td><div class="user-cell"><div class="avatar" style="background:#ffc107">赵</div>赵敏</div></td>
-          <td>zhao@example.com</td><td>用户</td>
-          <td><span class="status inactive">已停用</span></td><td>2026-02-20</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`,
-
-            animation: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; background: #0f0f1a;
-      font-family: 'Segoe UI', sans-serif; overflow: hidden;
-    }
-    .scene { position: relative; width: 300px; height: 300px; }
-    .ring {
-      position: absolute; top: 50%; left: 50%;
-      border: 3px solid transparent; border-radius: 50%;
-      animation: rotate 3s linear infinite;
-    }
-    .ring:nth-child(1) {
-      width: 200px; height: 200px; margin: -100px 0 0 -100px;
-      border-top-color: #6c63ff; animation-duration: 3s;
-    }
-    .ring:nth-child(2) {
-      width: 160px; height: 160px; margin: -80px 0 0 -80px;
-      border-right-color: #ff6584; animation-duration: 2.5s; animation-direction: reverse;
-    }
-    .ring:nth-child(3) {
-      width: 120px; height: 120px; margin: -60px 0 0 -60px;
-      border-bottom-color: #43e97b; animation-duration: 2s;
-    }
-    .ring:nth-child(4) {
-      width: 80px; height: 80px; margin: -40px 0 0 -40px;
-      border-left-color: #ffc107; animation-duration: 1.5s; animation-direction: reverse;
-    }
-    .center-dot {
-      position: absolute; top: 50%; left: 50%; width: 16px; height: 16px;
-      margin: -8px 0 0 -8px; background: white; border-radius: 50%;
-      animation: glow 2s ease-in-out infinite alternate;
-    }
-    @keyframes rotate { to { transform: rotate(360deg); } }
-    @keyframes glow {
-      from { box-shadow: 0 0 10px rgba(255,255,255,0.5); }
-      to { box-shadow: 0 0 30px rgba(108,99,255,0.8), 0 0 60px rgba(255,101,132,0.4); }
-    }
-    .title {
-      position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
-      color: white; font-size: 1.2rem; font-weight: 700; letter-spacing: 4px;
-      text-transform: uppercase; opacity: 0.8;
-    }
-    .particles { position: absolute; width: 100%; height: 100%; }
-    .particle {
-      position: absolute; width: 4px; height: 4px; background: rgba(108,99,255,0.6);
-      border-radius: 50%; animation: drift 6s linear infinite;
-    }
-    @keyframes drift {
-      0% { transform: translateY(100vh) scale(0); opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { transform: translateY(-100vh) scale(1); opacity: 0; }
-    }
-  </style>
-</head>
-<body>
-  <div class="particles" id="particles"></div>
-  <div class="scene">
-    <div class="ring"></div>
-    <div class="ring"></div>
-    <div class="ring"></div>
-    <div class="ring"></div>
-    <div class="center-dot"></div>
-  </div>
-  <div class="title">CSS Animation</div>
-  <script>
-    const container = document.getElementById('particles');
-    for (let i = 0; i < 30; i++) {
-      const p = document.createElement('div');
-      p.className = 'particle';
-      p.style.left = Math.random() * 100 + '%';
-      p.style.animationDelay = Math.random() * 6 + 's';
-      p.style.animationDuration = (4 + Math.random() * 4) + 's';
-      p.style.background = ['rgba(108,99,255,0.6)','rgba(255,101,132,0.6)','rgba(67,233,123,0.6)'][Math.floor(Math.random()*3)];
-      container.appendChild(p);
-    }
-  </script>
-</body>
-</html>`
-        };
-
-        // ==================== 初始化 ====================
-        window.addEventListener('DOMContentLoaded', () => {
-            loadTemplate('hello');
-        });
-
-        // 点击外部关闭导出菜单
-        document.addEventListener('click', (e) => {
-            const dropdown = document.querySelector('.export-dropdown');
-            if (!dropdown.contains(e.target)) {
-                document.getElementById('exportMenu').classList.remove('show');
-            }
-        });
-
-        // ==================== 编辑器功能 ====================
-        function switchLang(btn) {
-            // 保存当前内容
-            state[state.currentLang] = editor.value;
-
-            // 切换语言
-            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.currentLang = btn.dataset.lang;
-
-            // 加载对应内容
-            editor.value = state[state.currentLang];
-            document.getElementById('editorLabel').textContent = `编辑器 — ${state.currentLang.toUpperCase()}`;
-            document.getElementById('statusLang').textContent = state.currentLang.toUpperCase();
-
-            updateLineNumbers();
-            updateStats();
-        }
-
-        function onEditorInput() {
-            updateLineNumbers();
-            updateStats();
-            state[state.currentLang] = editor.value;
-
-            if (state.autoPreview) {
-                clearTimeout(window._previewTimer);
-                window._previewTimer = setTimeout(runPreview, 600);
-            }
-        }
-
-        function updateLineNumbers() {
-            const lines = editor.value.split('\n').length;
-            lineNumbers.innerHTML = Array.from({ length: lines }, (_, i) => i + 1).join('<br>');
-            document.getElementById('statusLines').textContent = `行: ${lines}`;
-        }
-
-        function updateStats() {
-            const text = editor.value;
-            const bytes = new Blob([text]).size;
-            document.getElementById('charCount').textContent = `${text.length} 字符`;
-            document.getElementById('statusSize').textContent = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
-        }
-
-        function syncScroll() {
-            lineNumbers.scrollTop = editor.scrollTop;
-        }
-
-        function handleTab(e) {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-                editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start + 2;
-                onEditorInput();
-            }
-        }
-
-        // ==================== 预览功能 ====================
-        function runPreview() {
-            state[state.currentLang] = editor.value;
-
-            const combinedHTML = buildFullHTML();
-            const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-            doc.open();
-            doc.write(combinedHTML);
-            doc.close();
-        }
-
-        function refreshPreview() {
-            runPreview();
-            showToast('预览已刷新', 'success');
-        }
-
-        function buildFullHTML() {
-            // 如果 HTML 编辑器中有完整的 HTML 文档，直接使用
-            const htmlContent = state.html.trim();
-            if (htmlContent.toLowerCase().includes('<!doctype') || htmlContent.toLowerCase().includes('<html')) {
-                // 注入额外的 CSS 和 JS
-                let result = htmlContent;
-                if (state.css.trim()) {
-                    const styleTag = `<style>\n${state.css}\n</style>`;
-                    result = result.replace('</head>', `${styleTag}\n</head>`);
-                }
-                if (state.js.trim()) {
-                    const scriptTag = `<script>\n${state.js}\n<\/script>`;
-                    result = result.replace('</body>', `${scriptTag}\n</body>`);
-                }
-                return result;
-            }
-
-            // 否则组合三部分
-            return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>${state.css}</style>
-</head>
-<body>
-  ${state.html}
-  <script>${state.js}<\/script>
-</body>
-</html>`;
-        }
-
-        // ==================== 工具功能 ====================
-        function clearEditor() {
-            if (confirm('确定要清空所有编辑器内容吗？')) {
-                state.html = '';
-                state.css = '';
-                state.js = '';
-                editor.value = '';
-                updateLineNumbers();
-                updateStats();
-                const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-                doc.open();
-                doc.write('');
-                doc.close();
-                showToast('编辑器已清空', 'info');
-            }
-        }
-
-        function copyCode() {
-            navigator.clipboard.writeText(editor.value).then(() => {
-                showToast('代码已复制到剪贴板', 'success');
-            }).catch(() => {
-                // fallback
-                editor.select();
-                document.execCommand('copy');
-                showToast('代码已复制', 'success');
-            });
-        }
-
-        function formatCode() {
-            let code = editor.value;
-            // 简单的 HTML 格式化
-            if (state.currentLang === 'html') {
-                code = code.replace(/></g, '>\n<');
-                // 简单缩进
-                let indent = 0;
-                const lines = code.split('\n');
-                const formatted = lines.map(line => {
-                    line = line.trim();
-                    if (line.match(/^<\/(.*?)>/)) indent = Math.max(0, indent - 1);
-                    const result = '  '.repeat(indent) + line;
-                    if (line.match(/^<[^/!].*[^/]>$/) && !line.match(/^<(img|br|hr|input|meta|link)/i)) indent++;
-                    return result;
-                });
-                code = formatted.join('\n');
-            }
-            editor.value = code;
-            onEditorInput();
-            showToast('代码已格式化', 'success');
-        }
-
-        function loadTemplate(name) {
-            if (templates[name]) {
-                state.html = templates[name];
-                state.css = '';
-                state.js = '';
-
-                // 切换到 HTML 标签
-                document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-                document.querySelector('.lang-btn[data-lang="html"]').classList.add('active');
-                state.currentLang = 'html';
-                document.getElementById('editorLabel').textContent = '编辑器 — HTML';
-                document.getElementById('statusLang').textContent = 'HTML';
-
-                editor.value = state.html;
-                updateLineNumbers();
-                updateStats();
-                runPreview();
-                showToast(`已加载模板: ${name}`, 'success');
-            }
-        }
-
-        // ==================== 导出功能 ====================
-        function toggleExportMenu() {
-            document.getElementById('exportMenu').classList.toggle('show');
-        }
-
-        function closeExportMenu() {
-            document.getElementById('exportMenu').classList.remove('show');
-        }
-
-        function showLoading() {
-            document.getElementById('loadingOverlay').classList.add('active');
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('active');
-        }
-
-        // ---- 导出 HTML ----
-        function exportHTML() {
-            closeExportMenu();
-            state[state.currentLang] = editor.value;
-            const content = buildFullHTML();
-            const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+</html>
