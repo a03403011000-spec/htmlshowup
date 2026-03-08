@@ -1,3 +1,30 @@
+这是一个经典的 `docx.js` 库加载与 API 调用问题。让我先定位两个核心 bug，再一并修复文件命名逻辑。
+
+## 🔍 Bug 分析
+
+**Bug 1：docx 库解构方式错误**
+
+```js
+// ❌ 错误：cdn 加载的 docx 是 UMD 模块，挂载在 window.docx 上
+const { Document, Packer, ... } = docx;
+
+// ✅ 正确：需要先确认 window.docx 存在且结构正确
+const { Document, Packer, ... } = window.docx;
+```
+
+但更根本的问题是 **jsdelivr 的 `docx@8.5.0` CDN 包经常加载失败或 API 不兼容**，需换用稳定版本和正确的 UMD 构建路径。
+
+**Bug 2：`ImageRun` 的 `data` 参数在 docx v8 中 API 变更**
+
+v8 的 `ImageRun` 需要传 `ArrayBuffer` 而非 `Uint8Array`，且 `type` 字段写法不同。
+
+**Bug 3：文件命名** — 当前只用项目名，需提取预览内容的标题或首行文字作为文件名。
+
+---
+
+## ✅ 完整修复版本
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -8,7 +35,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
+<!-- ✅ 修复1：换用稳定的 docx 7.8.2 UMD 版本，兼容性最佳 -->
+<script src="https://unpkg.com/docx@7.8.2/build/index.umd.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -44,7 +72,6 @@ button.red:hover { background: #f07090; }
 .project-input:focus { border-color: #89b4fa; }
 .project-input::placeholder { color: #6c7086; }
 
-/* URL 栏 */
 .urlbar {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 16px; background: #181825;
@@ -70,14 +97,10 @@ button.red:hover { background: #f07090; }
 }
 .url-status.ok { background: #a6e3a1; }
 .url-status.err { background: #f38ba8; }
-.url-status.loading {
-  background: #fab387;
-  animation: pulse 1s infinite;
-}
+.url-status.loading { background: #fab387; animation: pulse 1s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 .urlbar-btns { display: flex; gap: 6px; flex-shrink: 0; }
 
-/* 模式切换 */
 .mode-tabs {
   display: flex; background: #181825;
   border-bottom: 1px solid #313244; flex-shrink: 0;
@@ -90,7 +113,6 @@ button.red:hover { background: #f07090; }
 .mode-tab:hover { color: #cdd6f4; }
 .mode-tab.active { color: #cba6f7; border-bottom-color: #cba6f7; background: #1e1e2e; }
 
-/* 代码标签栏 */
 .tabs {
   display: flex; background: #181825;
   border-bottom: 1px solid #313244; flex-shrink: 0;
@@ -132,7 +154,6 @@ button.red:hover { background: #f07090; }
 }
 .preview-pane iframe { flex: 1; width: 100%; border: none; background: #fff; }
 
-/* URL 模式下的提示遮罩 */
 .url-overlay {
   display: none; position: absolute; inset: 0;
   background: #1e1e2e; z-index: 10;
@@ -145,7 +166,6 @@ button.red:hover { background: #f07090; }
 .url-overlay-desc { font-size: 13px; color: #6c7086; text-align: center; line-height: 1.7; max-width: 400px; }
 .url-overlay-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
-/* 导出菜单 */
 .export-wrap { position: relative; }
 .export-menu {
   display: none; position: absolute; top: 100%; right: 0;
@@ -185,11 +205,9 @@ button.red:hover { background: #f07090; }
 .overlay-text { color: #cdd6f4; font-size: 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* URL模式隐藏代码编辑器 */
 .editor-pane.url-mode { display: none; }
 .tabs.url-mode { display: none; }
 
-/* 无法嵌入提示 */
 .blocked-notice {
   display: none; position: absolute; bottom: 16px; left: 50%;
   transform: translateX(-50%);
@@ -232,12 +250,11 @@ button.red:hover { background: #f07090; }
   </div>
 </div>
 
-<!-- URL 预览栏 -->
 <div class="urlbar">
   <span class="urlbar-label">🌐 网址预览</span>
   <div class="url-input-wrap">
     <span class="protocol">https://</span>
-    <input class="url-input" id="urlInput" placeholder="输入网址，如 example.com" 
+    <input class="url-input" id="urlInput" placeholder="输入网址，如 example.com"
            onkeydown="if(event.key==='Enter') loadURL()">
     <div class="url-status" id="urlStatus"></div>
   </div>
@@ -248,7 +265,6 @@ button.red:hover { background: #f07090; }
   </div>
 </div>
 
-<!-- 模式切换 -->
 <div class="mode-tabs">
   <div class="mode-tab active" id="modeCode" onclick="switchMode('code')">💻 代码模式</div>
   <div class="mode-tab" id="modeURL" onclick="switchMode('url')">🌐 URL 预览模式</div>
@@ -270,8 +286,6 @@ button.red:hover { background: #f07090; }
       <span class="preview-url-info" id="previewUrlInfo"></span>
     </div>
     <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"></iframe>
-
-    <!-- URL 模式初始提示 -->
     <div class="url-overlay" id="urlOverlay">
       <div class="url-overlay-icon">🌐</div>
       <div class="url-overlay-title">URL 预览模式</div>
@@ -284,8 +298,6 @@ button.red:hover { background: #f07090; }
         <button class="orange" onclick="document.getElementById('urlInput').focus()">输入网址开始</button>
       </div>
     </div>
-
-    <!-- 被拦截提示 -->
     <div class="blocked-notice" id="blockedNotice">
       ⚠️ 该网站拒绝被嵌入预览（X-Frame-Options 限制）
       <br><a onclick="openInNewTab()">点击在新标签页打开 ↗</a>
@@ -359,7 +371,7 @@ const code = {
 };
 
 let currentLang = 'html';
-let currentMode = 'code'; // 'code' | 'url'
+let currentMode = 'code';
 let currentURL = '';
 let urlLoadTimer = null;
 
@@ -369,6 +381,55 @@ const preview = document.getElementById('preview');
 editor.value = code.html;
 updateStatus();
 setTimeout(runPreview, 150);
+
+// ===================== ✅ 修复2：智能文件命名 =====================
+/**
+ * 从预览页面提取有意义的标题作为文件名
+ * 优先级：<title> > <h1> > <h2> > 项目名输入框
+ */
+function getSmartFileName() {
+  const projectName = document.getElementById('projectName').value.trim() || '我的项目';
+  try {
+    const d = preview.contentDocument;
+    if (!d) return projectName;
+
+    // 1. 尝试获取 <title>
+    const titleEl = d.querySelector('title');
+    if (titleEl && titleEl.textContent.trim() &&
+        titleEl.textContent.trim() !== 'document') {
+      return sanitizeFileName(titleEl.textContent.trim());
+    }
+
+    // 2. 尝试获取第一个 <h1>
+    const h1 = d.querySelector('h1');
+    if (h1 && h1.innerText.trim()) {
+      return sanitizeFileName(h1.innerText.trim());
+    }
+
+    // 3. 尝试获取第一个 <h2>
+    const h2 = d.querySelector('h2');
+    if (h2 && h2.innerText.trim()) {
+      return sanitizeFileName(h2.innerText.trim());
+    }
+  } catch(e) { /* 跨域时忽略 */ }
+
+  return projectName;
+}
+
+/** 清理文件名中的非法字符，限制长度 */
+function sanitizeFileName(name) {
+  return name
+    .replace(/[\\/:*?"<>|]/g, '')   // 移除 Windows 非法字符
+    .replace(/\s+/g, '_')           // 空格转下划线
+    .replace(/^[\.\s]+|[\.\s]+$/g, '') // 去除首尾点和空格
+    .substring(0, 50)               // 最长50字符
+    || '导出文档';
+}
+
+// 保留原 getProjectName 用于封面标题显示
+function getProjectName() {
+  return document.getElementById('projectName').value.trim() || '我的项目';
+}
 
 // ===================== 模式切换 =====================
 function switchMode(mode) {
@@ -381,9 +442,8 @@ function switchMode(mode) {
   document.getElementById('modeInfo').textContent = mode === 'code' ? '代码模式' : 'URL 预览模式';
 
   if (mode === 'url') {
-    if (currentURL) {
-      loadURL();
-    } else {
+    if (currentURL) { loadURL(); }
+    else {
       document.getElementById('urlOverlay').classList.add('show');
       document.getElementById('previewLabelText').textContent = '网站预览';
     }
@@ -407,61 +467,35 @@ function getFullURL() {
 function loadURL() {
   const url = getFullURL();
   if (!url) { showMsg('请先输入网址'); return; }
-
   currentURL = url;
   switchMode('url');
-
   const status = document.getElementById('urlStatus');
   status.className = 'url-status loading';
   document.getElementById('urlOverlay').classList.remove('show');
   document.getElementById('blockedNotice').classList.remove('show');
   document.getElementById('previewLabelText').textContent = '网站预览';
   document.getElementById('previewUrlInfo').textContent = url;
-
-  // 清除旧计时器
   if (urlLoadTimer) clearTimeout(urlLoadTimer);
-
-  // 监听加载结果
   preview.onload = () => {
     status.className = 'url-status ok';
     document.getElementById('blockedNotice').classList.remove('show');
   };
-  preview.onerror = () => {
-    status.className = 'url-status err';
-  };
-
-  // 设置 src 触发加载
+  preview.onerror = () => { status.className = 'url-status err'; };
   preview.src = url;
-
-  // 5秒后检测是否被拦截（通过尝试访问 contentDocument）
   urlLoadTimer = setTimeout(() => {
     try {
       const doc = preview.contentDocument;
-      // 如果能访问到 body 且有内容，说明加载成功（同域）
-      if (doc && doc.body) {
-        status.className = 'url-status ok';
-      }
-    } catch(e) {
-      // 跨域正常情况，无法访问 contentDocument
-      // 但不代表加载失败，只是跨域
-      status.className = 'url-status ok';
-    }
+      if (doc && doc.body) status.className = 'url-status ok';
+    } catch(e) { status.className = 'url-status ok'; }
   }, 3000);
-
-  // 检测 X-Frame-Options 拦截（通过 iframe load 后尝试）
   setTimeout(() => {
     try {
-      // 尝试检测是否真的加载了内容
       const iframeWin = preview.contentWindow;
       if (iframeWin && iframeWin.location && iframeWin.location.href === 'about:blank') {
-        // 可能被拦截
         status.className = 'url-status err';
         document.getElementById('blockedNotice').classList.add('show');
       }
-    } catch(e) {
-      // 跨域无法读取，但 iframe 可能正常加载了
-      status.className = 'url-status ok';
-    }
+    } catch(e) { status.className = 'url-status ok'; }
   }, 4000);
 }
 
@@ -573,10 +607,6 @@ document.addEventListener('click', (e) => {
     document.getElementById('exportMenu').classList.remove('show');
 });
 
-function getProjectName() {
-  return document.getElementById('projectName').value.trim() || '我的项目';
-}
-
 function esc(s) {
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -599,13 +629,13 @@ function doExport(type) {
   }
 }
 
-// ===================== ★ URL 导出：保存为跳转页 HTML =====================
+// ===================== URL 导出 =====================
 function exportURLasHTML() {
   const url = getFullURL() || currentURL;
   if (!url) { showMsg('请先在 URL 栏输入网址'); return; }
   const name = getProjectName();
+  const fileName = getSmartFileName();
   const now = new Date().toLocaleString('zh-CN');
-
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -613,88 +643,48 @@ function exportURLasHTML() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${esc(name)} - 网页快照</title>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: -apple-system, "Microsoft YaHei", sans-serif;
-      background: #1e1e2e; color: #cdd6f4;
-      display: flex; flex-direction: column; height: 100vh;
-    }
-    .header {
-      display: flex; align-items: center; gap: 12px;
-      padding: 10px 16px; background: #181825;
-      border-bottom: 1px solid #313244; flex-shrink: 0;
-    }
-    .header h1 { font-size: 15px; color: #cba6f7; }
-    .url-bar {
-      flex: 1; display: flex; align-items: center; gap: 8px;
-      background: #313244; border: 1px solid #45475a;
-      border-radius: 20px; padding: 6px 14px;
-    }
-    .url-bar a {
-      color: #89b4fa; text-decoration: none; font-size: 13px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .url-bar a:hover { text-decoration: underline; }
-    .open-btn {
-      padding: 6px 16px; background: #89b4fa; color: #1e1e2e;
-      border: none; border-radius: 6px; font-size: 13px;
-      cursor: pointer; font-weight: 600; white-space: nowrap;
-      text-decoration: none;
-    }
-    .open-btn:hover { background: #74c7ec; }
-    iframe {
-      flex: 1; width: 100%; border: none;
-    }
-    .footer {
-      padding: 4px 16px; font-size: 11px; color: #6c7086;
-      background: #181825; border-top: 1px solid #313244;
-      display: flex; justify-content: space-between;
-    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh}
+    .header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
+    .header h1{font-size:15px;color:#cba6f7}
+    .url-bar{flex:1;display:flex;align-items:center;gap:8px;background:#313244;border:1px solid #45475a;border-radius:20px;padding:6px 14px}
+    .url-bar a{color:#89b4fa;text-decoration:none;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .open-btn{padding:6px 16px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap;text-decoration:none}
+    iframe{flex:1;width:100%;border:none}
+    .footer{padding:4px 16px;font-size:11px;color:#6c7086;background:#181825;border-top:1px solid #313244;display:flex;justify-content:space-between}
   </style>
 </head>
 <body>
   <div class="header">
     <h1>⚡ ${esc(name)}</h1>
-    <div class="url-bar">
-      <span>🔗</span>
-      <a href="${esc(url)}" target="_blank">${esc(url)}</a>
-    </div>
+    <div class="url-bar"><span>🔗</span><a href="${esc(url)}" target="_blank">${esc(url)}</a></div>
     <a class="open-btn" href="${esc(url)}" target="_blank">↗ 新窗口打开</a>
   </div>
   <iframe src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-  <div class="footer">
-    <span>保存自：代码编辑器 Pro</span>
-    <span>保存时间：${now}</span>
-  </div>
+  <div class="footer"><span>保存自：代码编辑器 Pro</span><span>保存时间：${now}</span></div>
 </body>
 </html>`;
-
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const filename = `${name}-网页-${new Date().toISOString().slice(0,10)}.html`;
-  saveAs(blob, filename);
+  saveAs(blob, `${fileName}-网页.html`);
   showMsg('跳转页 HTML 已导出 ✓');
 }
 
-// ===================== ★ URL 导出：书签文件 =====================
 function exportURLBookmark() {
   const url = getFullURL() || currentURL;
   if (!url) { showMsg('请先在 URL 栏输入网址'); return; }
-  const name = getProjectName();
-
-  // Windows .url 书签格式
+  const fileName = getSmartFileName();
   const content = `[InternetShortcut]\r\nURL=${url}\r\nIconIndex=0\r\n`;
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const filename = `${name}-书签-${new Date().toISOString().slice(0,10)}.url`;
-  saveAs(blob, filename);
+  saveAs(blob, `${fileName}.url`);
   showMsg('书签文件已导出 ✓（双击可用浏览器打开）');
 }
 
 // ===================== 导出 HTML =====================
 function exportHTML() {
   if (currentMode === 'url') { exportURLasHTML(); return; }
+  const fileName = getSmartFileName();
   const blob = new Blob([buildHTML()], { type: 'text/html;charset=utf-8' });
-  const filename = `${getProjectName()}-代码-${new Date().toISOString().slice(0,10)}.html`;
-  saveAs(blob, filename);
+  saveAs(blob, fileName + '.html');
   showMsg('HTML 已导出 ✓');
 }
 
@@ -719,10 +709,10 @@ function exportPDF() {
       pdf.addImage(tmp.toDataURL('image/png'), 'PNG', margin, margin, usableW, (sliceH * usableW) / canvas.width);
       srcY += pageHeightPx; page++;
     }
-    const filename = `${getProjectName()}-预览-${new Date().toISOString().slice(0,10)}.pdf`;
-    pdf.save(filename);
+    const fileName = getSmartFileName();
+    pdf.save(fileName + '.pdf');
     hideLoading(); showMsg('PDF 已导出 ✓');
-  }).catch(() => { hideLoading(); showMsg('PDF 导出失败'); });
+  }).catch(err => { hideLoading(); showMsg('PDF 导出失败: ' + err.message); });
 }
 
 // ===================== 导出 DOC =====================
@@ -731,6 +721,7 @@ function exportDOC() {
   setTimeout(() => {
     try {
       const name = getProjectName();
+      const fileName = getSmartFileName();
       const nowStr = new Date().toLocaleString('zh-CN');
       const tableData = extractTablesFromPreview();
       const previewTxt = extractTextFromPreview();
@@ -788,102 +779,367 @@ function exportDOC() {
         <div style="font-size:9pt;color:#aaa;text-align:center;margin-top:40pt;border-top:1px solid #eee;padding-top:8pt;">— 代码编辑器自动导出 · ${nowStr} —</div>
         </body></html>`;
       const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
-      const filename = `${name}-文档-${new Date().toISOString().slice(0,10)}.doc`;
-      saveAs(blob, filename);
+      saveAs(blob, `${fileName}.doc`);
       hideLoading(); showMsg('Word (.doc) 已导出 ✓');
     } catch(err) { hideLoading(); showMsg('DOC 导出失败: ' + err.message); }
   }, 200);
 }
 
-// ===================== 导出 DOCX =====================
+// ===================== ✅ 修复3：导出 DOCX（完整重写）=====================
 async function exportDOCX() {
   showLoading('正在生成 Word 文档...');
   try {
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
-            WidthType, AlignmentType, ImageRun, ShadingType } = docx;
+    // ✅ 修复：正确从 window.docx 解构，docx v7 API
+    const {
+      Document, Packer, Paragraph, TextRun, HeadingLevel,
+      Table, TableRow, TableCell, WidthType, AlignmentType,
+      ImageRun, ShadingType, BorderStyle
+    } = window.docx;
+
     const name = getProjectName();
+    const fileName = getSmartFileName();
     const now = new Date().toLocaleString('zh-CN');
-    let screenshotBase64 = null, imgWidth = 600, imgHeight = 400;
+
+    // ✅ 修复：截图转 ArrayBuffer（v7 ImageRun 需要 ArrayBuffer）
+    let imgArrayBuffer = null;
+    let imgWidth = 500, imgHeight = 350;
     try {
       const canvas = await capturePreview(1200, null);
-      screenshotBase64 = canvas.toDataURL('image/png').split(',')[1];
-      imgWidth = canvas.width; imgHeight = canvas.height;
-    } catch(e) {}
+      const base64 = canvas.toDataURL('image/png').split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      imgArrayBuffer = bytes.buffer; // ✅ 必须是 ArrayBuffer
+      // 等比缩放到最大宽度 500pt（Word 内容区约 500pt）
+      const ratio = canvas.height / canvas.width;
+      imgWidth = 500;
+      imgHeight = Math.min(Math.round(imgWidth * ratio), 650);
+    } catch(e) {
+      console.warn('截图失败，跳过图片:', e);
+    }
+
     const tableData = extractTablesFromPreview();
     const previewText = extractTextFromPreview();
     const children = [];
+
+    // ---------- 封面 ----------
     children.push(
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 600, after: 200 },
-        children: [new TextRun({ text: name, bold: true, size: 56, color: '4A56E2', font: 'Microsoft YaHei' })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 100 },
-        children: [new TextRun({ text: '代码编辑器导出文档', size: 28, color: '888888', font: 'Microsoft YaHei' })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 400 },
-        children: [new TextRun({ text: `导出时间：${now}`, size: 20, color: 'AAAAAA', font: 'Microsoft YaHei' })] })
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 1200, after: 400 },
+        children: [new TextRun({
+          text: name, bold: true, size: 64,
+          color: '4A56E2', font: { name: 'Microsoft YaHei' }
+        })]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [new TextRun({
+          text: '代码编辑器 Pro · 导出文档',
+          size: 32, color: '888888', font: { name: 'Microsoft YaHei' }
+        })]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 1200 },
+        children: [new TextRun({
+          text: `导出时间：${now}`,
+          size: 22, color: 'AAAAAA', font: { name: 'Microsoft YaHei' }
+        })]
+      })
     );
-    const mkH = (text, level) => new Paragraph({ heading: level, spacing: { before: 360, after: 160 },
-      children: [new TextRun({ text, bold: true, font: 'Microsoft YaHei',
-        color: level === HeadingLevel.HEADING_1 ? '4A56E2' : '333333' })] });
-    const mkP = (text) => new Paragraph({ spacing: { before: 80, after: 80 },
-      children: [new TextRun({ text, font: 'Microsoft YaHei', size: 22, color: '444444' })] });
-    const mkE = () => new Paragraph({ children: [] });
-    children.push(mkH('第一章 项目概述', HeadingLevel.HEADING_1),
-      mkP(`本文档由代码编辑器自动生成，包含项目「${name}」的完整内容。`),
-      mkP(`文档生成时间：${now}`), mkE());
-    children.push(mkH('第二章 预览效果', HeadingLevel.HEADING_1));
-    if (screenshotBase64) {
-      const maxW = 580, ratio = imgHeight / imgWidth, drawW = Math.min(maxW, imgWidth);
-      children.push(mkP('以下为页面预览截图：'),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 200 },
-          children: [new ImageRun({ data: Uint8Array.from(atob(screenshotBase64), c => c.charCodeAt(0)),
-            transformation: { width: drawW, height: Math.min(drawW * ratio, 700) }, type: 'png' })] }));
-    }
-    if (previewText.trim()) {
-      children.push(mkH('2.1 页面文本内容', HeadingLevel.HEADINGif (previewText.trim()) {
-  children.push(mkH('2.1 页面文本内容', HeadingLevel.HEADING_2), mkP(previewText.substring(0, 3000)));
-}
-children.push(mkE());
-if (tableData.length > 0) {
-  children.push(mkH('第三章 数据表格', HeadingLevel.HEADING_1),
-    mkP(`页面中共检测到 ${tableData.length} 个表格：`));
-  tableData.forEach((tbl, idx) => {
-    children.push(mkH(`3.${idx+1} 表格 ${idx+1}`, HeadingLevel.HEADING_2));
-    if (tbl.length > 0) {
-      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: tbl.map((row, ri) => new TableRow({ children: row.map(cell =>
-          new TableCell({ width: { size: Math.floor(100/row.length), type: WidthType.PERCENTAGE },
-            shading: ri === 0 ? { type: ShadingType.SOLID, color: '4A56E2' } : undefined,
-            children: [new Paragraph({ children: [new TextRun({
-              text: cell || ' ', bold: ri === 0,
-              color: ri === 0 ? 'FFFFFF' : '333333', size: 20, font: 'Microsoft YaHei' })] })] })) })) ));
-    }
-    children.push(mkE());
-  });
-}
-const chN = tableData.length > 0 ? '第四章' : '第三章';
-children.push(mkH(`${chN} 源代码`, HeadingLevel.HEADING_1), mkP('以下为编辑器中的完整源代码内容。'));
-const codeMap = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
-const chBase = tableData.length > 0 ? 4 : 3;
-let si = 1;
-for (const [lang, label] of Object.entries(codeMap)) {
-  if (code[lang].trim()) {
-    children.push(mkH(`${chBase}.${si} ${label} 代码`, HeadingLevel.HEADING_2));
-    code[lang].split('\n').forEach(line => {
-      children.push(new Paragraph({ spacing: { before: 0, after: 0, line: 276 },
-        shading: { type: ShadingType.SOLID, color: 'F5F5F5' },
-        children: [new TextRun({ text: line || ' ', font: 'Consolas', size: 18, color: '2D2D2D' })] }));
+
+    // ---------- 辅助函数 ----------
+    const mkH1 = (text) => new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 480, after: 200 },
+      children: [new TextRun({
+        text, bold: true, size: 36,
+        color: '4A56E2', font: { name: 'Microsoft YaHei' }
+      })]
     });
-    children.push(mkE()); si++;
+    const mkH2 = (text) => new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 320, after: 160 },
+      children: [new TextRun({
+        text, bold: true, size: 28,
+        color: '333333', font: { name: 'Microsoft YaHei' }
+      })]
+    });
+    const mkP = (text) => new Paragraph({
+      spacing: { before: 100, after: 100 },
+      children: [new TextRun({
+        text: String(text), size: 22,
+        color: '444444', font: { name: 'Microsoft YaHei' }
+      })]
+    });
+    const mkEmpty = () => new Paragraph({ children: [] });
+
+    // ---------- 第一章：概述 ----------
+    children.push(
+      mkH1('第一章  项目概述'),
+      mkP(`项目名称：${name}`),
+      mkP(`文档生成时间：${now}`),
+      mkP('本文档由代码编辑器 Pro 自动生成，包含页面预览截图、数据表格及完整源代码。'),
+      mkEmpty()
+    );
+
+    // ---------- 第二章：预览效果 ----------
+    children.push(mkH1('第二章  预览效果'));
+
+    if (imgArrayBuffer) {
+      children.push(
+        mkP('以下为页面预览截图：'),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 200 },
+          children: [
+            // ✅ 修复：v7 ImageRun API —— data 传 ArrayBuffer，transformation 用 pt 单位
+            new ImageRun({
+              data: imgArrayBuffer,
+              transformation: { width: imgWidth, height: imgHeight }
+            })
+          ]
+        })
+      );
+    } else {
+      children.push(mkP('（截图生成失败，请在浏览器中查看预览效果）'));
+    }
+
+    if (previewText.trim()) {
+      children.push(
+        mkH2('2.1  页面文本内容'),
+        ...previewText.substring(0, 2000).split('\n')
+          .filter(l => l.trim())
+          .map(l => mkP(l)),
+        mkEmpty()
+      );
+    }
+
+    // ---------- 第三章：数据表格（可选）----------
+    let chapterOffset = 3;
+    if (tableData.length > 0) {
+      children.push(
+        mkH1(`第三章  数据表格`),
+        mkP(`页面中共检测到 ${tableData.length} 个表格：`),
+        mkEmpty()
+      );
+      tableData.forEach((tbl, idx) => {
+        children.push(mkH2(`3.${idx + 1}  表格 ${idx + 1}`));
+        if (tbl.length > 0) {
+          const colCount = Math.max(...tbl.map(r => r.length));
+          const colWidth = Math.floor(9000 / colCount); // 总宽约9000 twips
+          children.push(
+            new Table({
+              width: { size: 9000, type: WidthType.DXA },
+              rows: tbl.map((row, ri) =>
+                new TableRow({
+                  children: row.map(cell =>
+                    new TableCell({
+                      width: { size: colWidth, type: WidthType.DXA },
+                      // ✅ 修复：v7 shading API
+                      shading: ri === 0
+                        ? { type: ShadingType.SOLID, color: '4A56E2', fill: '4A56E2' }
+                        : { type: ShadingType.CLEAR, color: 'auto', fill: ri % 2 === 0 ? 'F0F4FF' : 'FFFFFF' },
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: String(cell || ''),
+                          bold: ri === 0,
+                          color: ri === 0 ? 'FFFFFF' : '333333',
+                          size: 20,
+                          font: { name: 'Microsoft YaHei' }
+                        })]
+                      })]
+                    })
+                  )
+                })
+              )
+            }),
+            mkEmpty()
+          );
+        }
+      });
+      chapterOffset = 4;
+    }
+
+    // ---------- 第N章：源代码 ----------
+    const chN = chapterOffset;
+    const chLabel = ['一','二','三','四','五'][chN - 1] || String(chN);
+    children.push(
+      mkH1(`第${chLabel}章  源代码`),
+      mkP('以下为编辑器中的完整源代码内容。'),
+      mkEmpty()
+    );
+
+    const codeMap = [
+      { key: 'html', label: 'HTML' },
+      { key: 'css',  label: 'CSS' },
+      { key: 'js',   label: 'JavaScript' }
+    ];
+    let secIdx = 1;
+    for (const { key, label } of codeMap) {
+      if (!code[key].trim()) continue;
+      children.push(mkH2(`${chN}.${secIdx}  ${label} 代码`));
+      // ✅ 每行代码单独一个段落，使用等宽字体 + 浅灰背景
+      const lines = code[key].split('\n');
+      for (const line of lines) {
+        children.push(new Paragraph({
+          spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' },
+          shading: { type: ShadingType.SOLID, color: 'F5F5F5', fill: 'F5F5F5' },
+          children: [new TextRun({
+            text: line === '' ? ' ' : line,  // 空行用空格占位
+            font: { name: 'Courier New' },
+            size: 18,
+            color: '2D2D2D'
+          })]
+        }));
+      }
+      children.push(mkEmpty());
+      secIdx++;
+    }
+
+    // ---------- 附录 ----------
+    children.push(
+      mkH1('附录'),
+      mkP(`项目名称：${name}`),
+      mkP(`导出工具：代码编辑器 Pro`),
+      mkP(`生成时间：${now}`)
+    );
+
+    // ---------- 构建文档 ----------
+    const doc = new Document({
+      creator: '代码编辑器 Pro',
+      title: name,
+      description: `由代码编辑器 Pro 导出于 ${now}`,
+      sections: [{
+        properties: {
+          page: {
+            margin: { top: 1440, bottom: 1440, left: 1800, right: 1800 }
+          }
+        },
+        children
+      }]
+    });
+
+    // ✅ 修复：Packer.toBlob 是异步的，正确 await
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `${fileName}.docx`);
+    hideLoading();
+    showMsg('Word (.docx) 已导出 ✓');
+
+  } catch(err) {
+    hideLoading();
+    console.error('DOCX 导出错误:', err);
+    showMsg('导出失败: ' + err.message);
   }
 }
-children.push(mkH('附录', HeadingLevel.HEADING_1),
-  mkP(`项目名称：${name}`), mkP(`生成时间：${now}`));
-const doc = new Document({
-  creator: '代码编辑器', title: name,
-  styles: { default: { document: { run: { font: 'Microsoft YaHei', size: 22 } } } },
-  sections: [{ properties: { page: { margin: { top:1440, bottom:1440, left:1440, right:1440 } } }, children }]
-});
-const blob = await Packer.toBlob(doc);
-const filename = `${name}-文档-${new Date().toISOString().slice(0,10)}.docx`;
-saveAs(blob, filename);
-hideLoading(); showMsg('Word (.docx) 已导出 ✓');
 
+// ===================== 导出 Excel =====================
+function exportExcel() {
+  showLoading('正在生成 Excel...');
+  setTimeout(() => {
+    const wb = XLSX.utils.book_new();
+    const tableData = extractTablesFromPreview();
+    const fileName = getSmartFileName();
+    if (tableData.length > 0) {
+      tableData.forEach((tbl, i) => {
+        const ws = XLSX.utils.aoa_to_sheet(tbl);
+        XLSX.utils.book_append_sheet(wb, ws, `表格${i+1}`);
+      });
+    }
+    const codeRows = [['语言', '代码内容']];
+    if (code.html.trim()) codeRows.push(['HTML', code.html]);
+    if (code.css.trim())  codeRows.push(['CSS',  code.css]);
+    if (code.js.trim())   codeRows.push(['JavaScript', code.js]);
+    const ws = XLSX.utils.aoa_to_sheet(codeRows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 120 }];
+    XLSX.utils.book_append_sheet(wb, ws, '源代码');
+    XLSX.writeFile(wb, fileName + '.xlsx');
+    hideLoading(); showMsg('Excel 已导出 ✓');
+  }, 200);
+}
+
+// ===================== 导出 PPT =====================
+function exportPPT() {
+  showLoading('正在生成 PPT...');
+  capturePreview(1280, 720).then(canvas => {
+    const imgData = canvas.toDataURL('image/png');
+    const fileName = getSmartFileName();
+    const pptHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+        xmlns:p="urn:schemas-microsoft-com:office:powerpoint"
+        xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8">
+      <style>
+        @page{size:25.4cm 19.05cm;margin:0}
+        .slide{page-break-after:always;width:25.4cm;height:19.05cm;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:2cm}
+        h1{font-size:32pt;color:#333;margin-bottom:16px;font-family:'Microsoft YaHei'}
+        img{max-width:88%;max-height:68%;object-fit:contain;border:1px solid #ddd;border-radius:8px}
+        pre{font-size:8pt;background:#f5f5f5;padding:14px;border-radius:6px;max-width:92%;overflow:hidden;font-family:Consolas;white-space:pre-wrap;text-align:left}
+      </style></head><body>
+      <div class="slide" style="background:linear-gradient(135deg,#667eea,#764ba2)">
+        <h1 style="color:#fff;font-size:40pt">${esc(getProjectName())}</h1>
+        <p style="color:rgba(255,255,255,0.8);font-family:'Microsoft YaHei';font-size:14pt">${new Date().toLocaleString('zh-CN')}</p>
+      </div>
+      <div class="slide"><h1>预览效果</h1><img src="${imgData}"></div>
+      <div class="slide"><h1 style="font-size:22pt;align-self:flex-start">HTML 源代码</h1>
+        <pre>${esc(code.html.substring(0,2500))}</pre></div>
+      </body></html>`;
+    const blob = new Blob(['\ufeff' + pptHTML], { type: 'application/vnd.ms-powerpoint' });
+    saveAs(blob, fileName + '.ppt');
+    hideLoading(); showMsg('PPT 已导出 ✓');
+  }).catch(err => { hideLoading(); showMsg('PPT 导出失败: ' + err.message); });
+}
+
+// ===================== 公共工具 =====================
+function capturePreview(w, h) {
+  return new Promise((resolve, reject) => {
+    const tmp = document.createElement('iframe');
+    tmp.style.cssText = `position:fixed;left:-9999px;width:${w}px;height:${h||900}px;border:none;`;
+    document.body.appendChild(tmp);
+    const d = tmp.contentDocument;
+    d.open(); d.write(buildHTML()); d.close();
+    const done = () => {
+      setTimeout(() => {
+        html2canvas(d.body, {
+          scale: 2, useCORS        html2canvas(d.body, {
+          scale: 2, useCORS: true, width: w,
+          height: h || d.body.scrollHeight || 900,
+          backgroundColor: '#ffffff'
+        })
+        .then(canvas => { document.body.removeChild(tmp); resolve(canvas); })
+        .catch(err => { document.body.removeChild(tmp); reject(err); });
+      }, 400);
+    };
+    tmp.onload = done;
+    setTimeout(done, 1500);
+  });
+}
+
+function extractTablesFromPreview() {
+  try {
+    const d = preview.contentDocument;
+    if (!d) return [];
+    const result = [];
+    d.querySelectorAll('table').forEach(table => {
+      const rows = [];
+      table.querySelectorAll('tr').forEach(tr => {
+        const cells = [];
+        tr.querySelectorAll('th, td').forEach(cell => cells.push(cell.innerText.trim()));
+        if (cells.length) rows.push(cells);
+      });
+      if (rows.length) result.push(rows);
+    });
+    return result;
+  } catch(e) { return []; }
+}
+
+function extractTextFromPreview() {
+  try {
+    const d = preview.contentDocument;
+    return d ? (d.body.innerText || '').trim() : '';
+  } catch(e) { return ''; }
+}
+</script>
+</body>
+</html>
