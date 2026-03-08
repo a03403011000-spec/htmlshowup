@@ -1,30 +1,4 @@
-这是一个经典的 `docx.js` 库加载与 API 调用问题。让我先定位两个核心 bug，再一并修复文件命名逻辑。
 
-## 🔍 Bug 分析
-
-**Bug 1：docx 库解构方式错误**
-
-```js
-// ❌ 错误：cdn 加载的 docx 是 UMD 模块，挂载在 window.docx 上
-const { Document, Packer, ... } = docx;
-
-// ✅ 正确：需要先确认 window.docx 存在且结构正确
-const { Document, Packer, ... } = window.docx;
-```
-
-但更根本的问题是 **jsdelivr 的 `docx@8.5.0` CDN 包经常加载失败或 API 不兼容**，需换用稳定版本和正确的 UMD 构建路径。
-
-**Bug 2：`ImageRun` 的 `data` 参数在 docx v8 中 API 变更**
-
-v8 的 `ImageRun` 需要传 `ArrayBuffer` 而非 `Uint8Array`，且 `type` 字段写法不同。
-
-**Bug 3：文件命名** — 当前只用项目名，需提取预览内容的标题或首行文字作为文件名。
-
----
-
-## ✅ 完整修复版本
-
-```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
