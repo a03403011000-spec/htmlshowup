@@ -1,1119 +1,929 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>代码编辑器 Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- ✅ 修复1：换用稳定的 docx 7.8.2 UMD 版本，兼容性最佳 -->
-<script src="https://unpkg.com/docx@7.8.2/build/index.umd.js"></script>
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  font-family: -apple-system, "Microsoft YaHei", sans-serif;
-  background: #1e1e2e; color: #cdd6f4;
-  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-}
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 16px; background: #181825;
-  border-bottom: 1px solid #313244; flex-shrink: 0; gap: 8px; flex-wrap: wrap;
-}
-.topbar h1 { font-size: 15px; font-weight: 600; color: #cba6f7; white-space: nowrap; }
-.btn-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-button {
-  padding: 6px 14px; border: 1px solid #45475a; border-radius: 6px;
-  background: #313244; color: #cdd6f4; font-size: 13px; cursor: pointer;
-  transition: background 0.15s; white-space: nowrap;
-}
-button:hover { background: #45475a; }
-button.primary { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; font-weight: 600; }
-button.primary:hover { background: #74c7ec; }
-button.green { background: #a6e3a1; color: #1e1e2e; border-color: #a6e3a1; font-weight: 600; }
-button.green:hover { background: #94e2d5; }
-button.orange { background: #fab387; color: #1e1e2e; border-color: #fab387; font-weight: 600; }
-button.orange:hover { background: #f9a87a; }
-button.red { background: #f38ba8; color: #1e1e2e; border-color: #f38ba8; font-weight: 600; }
-button.red:hover { background: #f07090; }
-.project-input {
-  padding: 5px 10px; border: 1px solid #45475a; border-radius: 6px;
-  background: #313244; color: #cdd6f4; font-size: 13px; width: 140px; outline: none;
-}
-.project-input:focus { border-color: #89b4fa; }
-.project-input::placeholder { color: #6c7086; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码编辑器 & 多格式导出工具</title>
 
-.urlbar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 16px; background: #181825;
-  border-bottom: 1px solid #313244; flex-shrink: 0;
-}
-.urlbar-label { font-size: 12px; color: #6c7086; white-space: nowrap; }
-.url-input-wrap {
-  flex: 1; display: flex; align-items: center;
-  background: #313244; border: 1px solid #45475a;
-  border-radius: 20px; padding: 0 12px; gap: 6px;
-  transition: border-color 0.2s;
-}
-.url-input-wrap:focus-within { border-color: #89b4fa; }
-.url-input-wrap .protocol { color: #6c7086; font-size: 13px; user-select: none; }
-.url-input {
-  flex: 1; background: transparent; border: none; outline: none;
-  color: #cdd6f4; font-size: 13px; padding: 5px 0;
-}
-.url-input::placeholder { color: #6c7086; }
-.url-status {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #6c7086; flex-shrink: 0; transition: background 0.3s;
-}
-.url-status.ok { background: #a6e3a1; }
-.url-status.err { background: #f38ba8; }
-.url-status.loading { background: #fab387; animation: pulse 1s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-.urlbar-btns { display: flex; gap: 6px; flex-shrink: 0; }
+    <!-- 外部库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
-.mode-tabs {
-  display: flex; background: #181825;
-  border-bottom: 1px solid #313244; flex-shrink: 0;
-}
-.mode-tab {
-  padding: 7px 20px; font-size: 13px; cursor: pointer;
-  border-bottom: 2px solid transparent; color: #6c7086;
-  transition: all 0.15s; user-select: none;
-}
-.mode-tab:hover { color: #cdd6f4; }
-.mode-tab.active { color: #cba6f7; border-bottom-color: #cba6f7; background: #1e1e2e; }
+    <style>
+        /* ========== CSS 变量 & 重置 ========== */
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --bg-card: #1e1e36;
+            --accent-primary: #6c63ff;
+            --accent-secondary: #ff6584;
+            --accent-tertiary: #43e97b;
+            --text-primary: #e8e8f0;
+            --text-secondary: #a0a0c0;
+            --text-muted: #6a6a8e;
+            --border-color: #2a2a4a;
+            --shadow-glow: 0 0 30px rgba(108, 99, 255, 0.15);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-.tabs {
-  display: flex; background: #181825;
-  border-bottom: 1px solid #313244; flex-shrink: 0;
-}
-.tab {
-  padding: 8px 20px; font-size: 13px; cursor: pointer;
-  border-bottom: 2px solid transparent; color: #6c7086;
-  transition: all 0.15s; user-select: none;
-}
-.tab:hover { color: #cdd6f4; }
-.tab.active { color: #89b4fa; border-bottom-color: #89b4fa; background: #1e1e2e; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-.main { flex: 1; display: flex; overflow: hidden; }
-.editor-pane {
-  flex: 1; display: flex; flex-direction: column;
-  border-right: 2px solid #313244; min-width: 0;
-}
-.editor-pane textarea {
-  flex: 1; width: 100%; padding: 14px;
-  background: #1e1e2e; color: #cdd6f4;
-  border: none; outline: none; resize: none;
-  font-family: "Cascadia Code","Fira Code",Consolas,monospace;
-  font-size: 14px; line-height: 1.6; tab-size: 2;
-}
-.preview-pane {
-  flex: 1; display: flex; flex-direction: column;
-  min-width: 0; background: #fff; position: relative;
-}
-.preview-label {
-  padding: 6px 16px; font-size: 12px; color: #6c7086;
-  background: #181825; border-bottom: 1px solid #313244;
-  flex-shrink: 0; display: flex; align-items: center;
-  justify-content: space-between; gap: 8px;
-}
-.preview-label .preview-url-info {
-  font-size: 11px; color: #89b4fa;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 300px;
-}
-.preview-pane iframe { flex: 1; width: 100%; border: none; background: #fff; }
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
 
-.url-overlay {
-  display: none; position: absolute; inset: 0;
-  background: #1e1e2e; z-index: 10;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; padding: 32px;
-}
-.url-overlay.show { display: flex; }
-.url-overlay-icon { font-size: 48px; }
-.url-overlay-title { font-size: 18px; font-weight: 600; color: #cdd6f4; text-align: center; }
-.url-overlay-desc { font-size: 13px; color: #6c7086; text-align: center; line-height: 1.7; max-width: 400px; }
-.url-overlay-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .bg-animation {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0; overflow: hidden; pointer-events: none;
+        }
+        .bg-animation .orb {
+            position: absolute; border-radius: 50%;
+            filter: blur(80px); opacity: 0.3;
+            animation: float 20s infinite ease-in-out;
+        }
+        .bg-animation .orb:nth-child(1) { width:400px;height:400px;background:var(--accent-primary);top:-100px;left:-100px;animation-delay:0s; }
+        .bg-animation .orb:nth-child(2) { width:350px;height:350px;background:var(--accent-secondary);bottom:-80px;right:-80px;animation-delay:-7s; }
+        .bg-animation .orb:nth-child(3) { width:300px;height:300px;background:var(--accent-tertiary);top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:-14s; }
 
-.export-wrap { position: relative; }
-.export-menu {
-  display: none; position: absolute; top: 100%; right: 0;
-  margin-top: 4px; background: #313244; border: 1px solid #45475a;
-  border-radius: 8px; padding: 4px 0; z-index: 999; min-width: 210px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-.export-menu.show { display: block; }
-.export-menu button {
-  display: block; width: 100%; text-align: left;
-  padding: 8px 16px; border: none; border-radius: 0;
-  background: transparent; color: #cdd6f4; font-size: 13px;
-}
-.export-menu button:hover { background: #45475a; }
-.export-menu .menu-divider { height: 1px; background: #45475a; margin: 4px 0; }
-.export-menu .menu-section {
-  padding: 4px 16px 2px; font-size: 11px; color: #6c7086; user-select: none;
-}
+        @keyframes float {
+            0%,100% { transform:translate(0,0) scale(1); }
+            25% { transform:translate(50px,-50px) scale(1.1); }
+            50% { transform:translate(-30px,30px) scale(0.95); }
+            75% { transform:translate(40px,40px) scale(1.05); }
+        }
 
-.bottombar {
-  padding: 4px 16px; font-size: 12px; color: #6c7086;
-  background: #181825; border-top: 1px solid #313244;
-  display: flex; justify-content: space-between; flex-shrink: 0;
-}
-.overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6); z-index: 9998;
-  justify-content: center; align-items: center;
-  flex-direction: column; gap: 12px;
-}
-.overlay.show { display: flex; }
-.spinner {
-  width: 40px; height: 40px; border: 3px solid #45475a;
-  border-top-color: #89b4fa; border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-.overlay-text { color: #cdd6f4; font-size: 14px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+        .app-container {
+            position: relative; z-index: 1;
+            max-width: 1500px; margin: 0 auto;
+            padding: 20px; min-height: 100vh;
+        }
 
-.editor-pane.url-mode { display: none; }
-.tabs.url-mode { display: none; }
+        .app-header { text-align: center; padding: 30px 0 20px; }
+        .app-header h1 {
+            font-size: 2.2rem; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .app-header p { color: var(--text-secondary); margin-top: 8px; font-size: 0.95rem; }
 
-.blocked-notice {
-  display: none; position: absolute; bottom: 16px; left: 50%;
-  transform: translateX(-50%);
-  background: #313244; border: 1px solid #f38ba8;
-  border-radius: 10px; padding: 12px 20px;
-  font-size: 13px; color: #f38ba8; z-index: 20;
-  text-align: center; max-width: 380px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-.blocked-notice.show { display: block; }
-.blocked-notice a { color: #89b4fa; cursor: pointer; text-decoration: underline; }
-</style>
+        .toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px; padding: 16px 20px;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); margin-bottom: 16px;
+        }
+        .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .lang-selector {
+            display: flex; background: var(--bg-primary);
+            border-radius: var(--radius-sm); overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        .lang-btn {
+            padding: 8px 16px; border: none; background: transparent;
+            color: var(--text-secondary); font-size: 0.85rem;
+            cursor: pointer; transition: var(--transition); font-weight: 500;
+        }
+        .lang-btn.active { background: var(--accent-primary); color: white; }
+        .lang-btn:hover:not(.active) { background: rgba(108,99,255,0.15); color: var(--text-primary); }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; transition: var(--transition);
+            background: var(--bg-tertiary); color: var(--text-primary); white-space: nowrap;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); }
+        .btn:active { transform: translateY(0); }
+        .btn-primary { background: linear-gradient(135deg, var(--accent-primary), #8b7aff); border-color: var(--accent-primary); color: white; }
+        .btn-primary:hover { box-shadow: 0 4px 20px rgba(108,99,255,0.4); }
+        .btn-success { background: linear-gradient(135deg, #2ecc71, var(--accent-tertiary)); border-color: #2ecc71; color: white; }
+        .btn-danger { background: linear-gradient(135deg, var(--accent-secondary), #ff8fa3); border-color: var(--accent-secondary); color: white; }
+        .btn-export { background: var(--bg-card); border-color: var(--border-color); }
+        .btn-export:hover { border-color: var(--accent-primary); background: rgba(108,99,255,0.1); }
+        .btn-icon { font-size: 1rem; }
+
+        .export-dropdown { position: relative; }
+        .export-menu {
+            position: absolute; top: calc(100% + 8px); right: 0;
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: var(--radius-md); padding: 8px; min-width: 200px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); z-index: 100;
+            display: none; animation: slideDown 0.2s ease;
+        }
+        .export-menu.show { display: block; }
+        @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+
+        .export-menu-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; border: none; background: transparent;
+            color: var(--text-primary); font-size: 0.88rem;
+            cursor: pointer; border-radius: var(--radius-sm);
+            transition: var(--transition); width: 100%; text-align: left;
+        }
+        .export-menu-item:hover { background: rgba(108,99,255,0.15); }
+        .export-menu-item .icon { font-size: 1.2rem; width: 28px; text-align: center; }
+        .export-menu-item .label { flex: 1; }
+        .export-menu-item .badge { font-size:0.7rem;padding:2px 6px;border-radius:4px;background:rgba(108,99,255,0.2);color:var(--accent-primary); }
+
+        .editor-layout {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 16px; height: calc(100vh - 260px); min-height: 500px;
+        }
+        .panel {
+            display: flex; flex-direction: column;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); overflow: hidden; transition: var(--transition);
+        }
+        .panel:hover { border-color: rgba(108,99,255,0.3); }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 18px; background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+        }
+        .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; }
+        .panel-title .dot { width:8px;height:8px;border-radius:50%;background:var(--accent-tertiary);animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .panel-body { flex: 1; overflow: hidden; position: relative; }
+
+        .editor-wrapper { position:relative;width:100%;height:100%;display:flex; }
+        .line-numbers {
+            padding: 16px 8px 16px 12px; background: rgba(0,0,0,0.2);
+            color: var(--text-muted); font-family: 'Fira Code','Consolas',monospace;
+            font-size: 0.85rem; line-height: 1.65; text-align: right;
+            user-select: none; overflow: hidden; min-width: 48px; flex-shrink: 0;
+        }
+        .code-editor {
+            flex: 1; width: 100%; height: 100%; padding: 16px;
+            background: transparent; color: var(--text-primary);
+            border: none; outline: none; resize: none;
+            font-family: 'Fira Code','Consolas',monospace;
+            font-size: 0.85rem; line-height: 1.65; tab-size: 2;
+            white-space: pre; overflow: auto;
+        }
+        .code-editor::placeholder { color: var(--text-muted); }
+        .code-editor::-webkit-scrollbar { width:8px;height:8px; }
+        .code-editor::-webkit-scrollbar-track { background:transparent; }
+        .code-editor::-webkit-scrollbar-thumb { background:var(--border-color);border-radius:4px; }
+        .code-editor::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+
+        .preview-frame { width:100%;height:100%;border:none;background:white; }
+
+        .status-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 20px; background: var(--bg-secondary);
+            border: 1px solid var(--border-color); border-radius: var(--radius-md);
+            margin-top: 16px; font-size: 0.8rem; color: var(--text-secondary);
+        }
+        .status-bar .status-left, .status-bar .status-right { display:flex;align-items:center;gap:16px; }
+        .status-item { display:flex;align-items:center;gap:5px; }
+        .status-dot { width:6px;height:6px;border-radius:50%;background:var(--accent-tertiary); }
+
+        .toast-container { position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px; }
+        .toast {
+            display:flex;align-items:center;gap:10px;padding:14px 20px;
+            background:var(--bg-card);border:1px solid var(--border-color);
+            border-radius:var(--radius-md);color:var(--text-primary);font-size:0.88rem;
+            box-shadow:0 10px 40px rgba(0,0,0,0.3);
+            animation:toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+            min-width:280px;
+        }
+        .toast.success { border-left:3px solid var(--accent-tertiary); }
+        .toast.error { border-left:3px solid var(--accent-secondary); }
+        .toast.info { border-left:3px solid var(--accent-primary); }
+        @keyframes toastIn { from{opacity:0;transform:translateX(50px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes toastOut { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(50px)} }
+
+        .template-bar {
+            display:flex;align-items:center;gap:8px;padding:12px 20px;
+            background:var(--bg-secondary);border:1px solid var(--border-color);
+            border-radius:var(--radius-lg);margin-bottom:16px;overflow-x:auto;
+        }
+        .template-bar-label { font-size:0.82rem;color:var(--text-muted);white-space:nowrap;font-weight:600; }
+        .template-chip {
+            padding:6px 14px;border:1px solid var(--border-color);border-radius:20px;
+            background:var(--bg-card);color:var(--text-secondary);font-size:0.8rem;
+            cursor:pointer;transition:var(--transition);white-space:nowrap;
+        }
+        .template-chip:hover { border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(108,99,255,0.1); }
+
+        .loading-overlay {
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(15,15,26,0.8);display:flex;align-items:center;
+            justify-content:center;z-index:9998;backdrop-filter:blur(4px);
+            opacity:0;pointer-events:none;transition:opacity 0.3s;
+        }
+        .loading-overlay.active { opacity:1;pointer-events:all; }
+        .loading-spinner {
+            width:48px;height:48px;border:3px solid var(--border-color);
+            border-top-color:var(--accent-primary);border-radius:50%;
+            animation:spin 0.8s linear infinite;
+        }
+        @keyframes spin { to{transform:rotate(360deg)} }
+
+        /* Word 导出配置弹窗 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 9997;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 32px; width: 480px;
+            max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: modalIn 0.3s ease;
+        }
+        @keyframes modalIn { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+        .modal-title {
+            font-size: 1.1rem; font-weight: 700; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .modal-field { margin-bottom: 16px; }
+        .modal-field label { display:block;font-size:0.85rem;color:var(--text-secondary);margin-bottom:6px;font-weight:600; }
+        .modal-field input, .modal-field select, .modal-field textarea {
+            width: 100%; padding: 10px 14px;
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); color: var(--text-primary);
+            font-size: 0.9rem; transition: var(--transition);
+        }
+        .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus {
+            outline: none; border-color: var(--accent-primary);
+        }
+        .modal-field select option { background: var(--bg-card); }
+        .modal-field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+        .modal-actions { display:flex;gap:10px;justify-content:flex-end;margin-top:24px; }
+        .modal-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+
+        @media (max-width:900px) {
+            .editor-layout { grid-template-columns:1fr;height:auto; }
+            .panel { min-height:350px; }
+            .toolbar { flex-direction:column;align-items:stretch; }
+            .toolbar-left,.toolbar-right { justify-content:center; }
+            .app-header h1 { font-size:1.6rem; }
+        }
+    </style>
 </head>
 <body>
 
-<div class="topbar">
-  <h1>⚡ 代码编辑器 Pro</h1>
-  <div class="btn-group">
-    <input class="project-input" id="projectName" placeholder="项目名称..." value="我的项目">
-    <button class="primary" id="runBtn" onclick="runPreview()">▶ 运行</button>
-    <button onclick="clearAll()">清空</button>
-    <button onclick="copyCode()">复制</button>
-    <div class="export-wrap">
-      <button class="green" onclick="toggleMenu()">📦 导出 ▾</button>
-      <div class="export-menu" id="exportMenu">
-        <div class="menu-section">代码模式</div>
-        <button onclick="doExport('html')">🌐 HTML (.html)</button>
-        <button onclick="doExport('pdf')">📄 PDF (.pdf)</button>
-        <button onclick="doExport('doc')">📝 Word 兼容版 (.doc)</button>
-        <button onclick="doExport('docx')">📝 Word 现代版 (.docx)</button>
-        <div class="menu-divider"></div>
-        <button onclick="doExport('excel')">📊 Excel (.xlsx)</button>
-        <button onclick="doExport('ppt')">📽️ PPT (.ppt)</button>
-        <div class="menu-divider"></div>
-        <div class="menu-section">URL模式</div>
-        <button onclick="doExport('url-html')">🔗 保存为跳转页 (.html)</button>
-        <button onclick="doExport('url-bookmark')">🔖 保存书签文件 (.url)</button>
-      </div>
+<div class="bg-animation">
+    <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="loading-spinner"></div></div>
+
+<!-- Word 导出配置弹窗 -->
+<div class="modal-overlay" id="wordModal">
+    <div class="modal-box">
+        <div class="modal-title">📝 Word 文档导出配置</div>
+
+        <div class="modal-field">
+            <label>文档标题</label>
+            <input type="text" id="wordTitle" placeholder="请输入文档标题" value="我的文档">
+        </div>
+
+        <div class="modal-field">
+            <label>作者</label>
+            <input type="text" id="wordAuthor" placeholder="作者姓名" value="代码编辑器">
+        </div>
+
+        <div class="modal-row">
+            <div class="modal-field">
+                <label>页面方向</label>
+                <select id="wordOrientation">
+                    <option value="portrait">纵向（Portrait）</option>
+                    <option value="landscape">横向（Landscape）</option>
+                </select>
+            </div>
+            <div class="modal-field">
+                <label>导出内容</label>
+                <select id="wordContent">
+                    <option value="rendered">渲染后的文本内容</option>
+                    <option value="source">原始源代码</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="modal-field">
+            <label>文档描述（可选）</label>
+            <textarea id="wordDesc" placeholder="在此输入文档描述或摘要..."></textarea>
+        </div>
+
+        <div class="modal-field">
+            <label>文件名</label>
+            <input type="text" id="wordFilename" placeholder="文件名（无需扩展名）" value="exported-document">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn" onclick="closeWordModal()">取消</button>
+            <button class="btn btn-primary" onclick="doExportWord()">
+                <span>📥</span> 生成并下载
+            </button>
+        </div>
     </div>
-  </div>
 </div>
 
-<div class="urlbar">
-  <span class="urlbar-label">🌐 网址预览</span>
-  <div class="url-input-wrap">
-    <span class="protocol">https://</span>
-    <input class="url-input" id="urlInput" placeholder="输入网址，如 example.com"
-           onkeydown="if(event.key==='Enter') loadURL()">
-    <div class="url-status" id="urlStatus"></div>
-  </div>
-  <div class="urlbar-btns">
-    <button class="orange" onclick="loadURL()">🔍 预览</button>
-    <button onclick="openInNewTab()">↗ 新标签</button>
-    <button onclick="clearURL()">✕</button>
-  </div>
-</div>
+<div class="app-container">
+    <header class="app-header">
+        <h1>⚡ 代码编辑器 & 多格式导出</h1>
+        <p>编写代码 · 实时预览 · 一键导出为 Excel / Word / PPT / PDF / HTML</p>
+    </header>
 
-<div class="mode-tabs">
-  <div class="mode-tab active" id="modeCode" onclick="switchMode('code')">💻 代码模式</div>
-  <div class="mode-tab" id="modeURL" onclick="switchMode('url')">🌐 URL 预览模式</div>
-</div>
-
-<div class="tabs" id="codeTabs">
-  <div class="tab active" data-lang="html" onclick="switchTab(this)">HTML</div>
-  <div class="tab" data-lang="css" onclick="switchTab(this)">CSS</div>
-  <div class="tab" data-lang="js" onclick="switchTab(this)">JavaScript</div>
-</div>
-
-<div class="main">
-  <div class="editor-pane" id="editorPane">
-    <textarea id="editor" spellcheck="false" placeholder="在这里写代码，点击运行查看效果..."></textarea>
-  </div>
-  <div class="preview-pane">
-    <div class="preview-label">
-      <span id="previewLabelText">预览区域</span>
-      <span class="preview-url-info" id="previewUrlInfo"></span>
+    <div class="template-bar">
+        <span class="template-bar-label">📌 快速模板：</span>
+        <button class="template-chip" onclick="loadTemplate('hello')">Hello World</button>
+        <button class="template-chip" onclick="loadTemplate('form')">表单页面</button>
+        <button class="template-chip" onclick="loadTemplate('card')">卡片布局</button>
+        <button class="template-chip" onclick="loadTemplate('dashboard')">仪表盘</button>
+        <button class="template-chip" onclick="loadTemplate('table')">数据表格</button>
+        <button class="template-chip" onclick="loadTemplate('animation')">CSS 动画</button>
     </div>
-    <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"></iframe>
-    <div class="url-overlay" id="urlOverlay">
-      <div class="url-overlay-icon">🌐</div>
-      <div class="url-overlay-title">URL 预览模式</div>
-      <div class="url-overlay-desc">
-        在上方输入网址，点击「预览」按钮加载网站。<br><br>
-        ⚠️ 注意：部分网站（如 Google、GitHub）设置了安全策略，<br>
-        会拒绝被嵌入预览，此时可点击「新标签」在新窗口打开。
-      </div>
-      <div class="url-overlay-actions">
-        <button class="orange" onclick="document.getElementById('urlInput').focus()">输入网址开始</button>
-      </div>
-    </div>
-    <div class="blocked-notice" id="blockedNotice">
-      ⚠️ 该网站拒绝被嵌入预览（X-Frame-Options 限制）
-      <br><a onclick="openInNewTab()">点击在新标签页打开 ↗</a>
-    </div>
-  </div>
-</div>
 
-<div class="bottombar">
-  <span id="statusInfo">HTML | 0 字符</span>
-  <span id="modeInfo">代码模式</span>
-</div>
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <div class="lang-selector">
+                <button class="lang-btn active" data-lang="html" onclick="switchLang(this)">HTML</button>
+                <button class="lang-btn" data-lang="css" onclick="switchLang(this)">CSS</button>
+                <button class="lang-btn" data-lang="js" onclick="switchLang(this)">JavaScript</button>
+            </div>
+            <button class="btn btn-primary" onclick="runPreview()"><span class="btn-icon">▶</span> 运行预览</button>
+            <button class="btn" onclick="formatCode()"><span class="btn-icon">✨</span> 格式化</button>
+            <button class="btn btn-danger" onclick="clearEditor()"><span class="btn-icon">🗑</span> 清空</button>
+        </div>
+        <div class="toolbar-right">
+            <button class="btn" onclick="copyCode()"><span class="btn-icon">📋</span> 复制</button>
+            <div class="export-dropdown">
+                <button class="btn btn-success" onclick="toggleExportMenu()">
+                    <span class="btn-icon">📦</span> 导出 ▾
+                </button>
+                <div class="export-menu" id="exportMenu">
+                    <button class="export-menu-item" onclick="exportHTML()">
+                        <span class="icon">🌐</span><span class="label">HTML 文件</span><span class="badge">.html</span>
+                    </button>
+                    <button class="export-menu-item" onclick="exportPDF()">
+                        <span class="icon">📄</span><span class="label">PDF 文档</span><span class="badge">.pdf</span>
+                    </button>
+                    <button class="export-menu-item" onclick="exportWord()">
+                        <span class="icon">📝</span><span class="label">Word 文档</span><span class="badge">.docx</span>
+                    </button>
+                    <button class="export-menu-item" onclick="exportExcel()">
+                        <span class="icon">📊</span><span class="label">Excel 表格</span><span class="badge">.xlsx</span>
+                    </button>
+                    <button class="export-menu-item" onclick="exportPPT()">
+                        <span class="icon">📽</span><span class="label">PPT 演示</span><span class="badge">.pptx</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="overlay" id="overlay">
-  <div class="spinner"></div>
-  <div class="overlay-text" id="overlayText">正在导出...</div>
+    <div class="editor-layout">
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="dot"></span>
+                    <span id="editorLabel">编辑器 — HTML</span>
+                </div>
+                <span style="font-size:0.78rem;color:var(--text-muted)" id="charCount">0 字符</span>
+            </div>
+            <div class="panel-body">
+                <div class="editor-wrapper">
+                    <div class="line-numbers" id="lineNumbers">1</div>
+                    <textarea
+                        class="code-editor" id="codeEditor"
+                        placeholder="在此输入代码..." spellcheck="false"
+                        oninput="onEditorInput()" onscroll="syncScroll()"
+                        onkeydown="handleTab(event)"
+                    ></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="dot" style="background:var(--accent-secondary)"></span>
+                    <span>实时预览</span>
+                </div>
+                <button class="btn" style="padding:5px 12px;font-size:0.78rem" onclick="refreshPreview()">🔄 刷新</button>
+            </div>
+            <div class="panel-body">
+                <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item"><span class="status-dot"></span><span>就绪</span></div>
+            <div class="status-item" id="statusLang">HTML</div>
+        </div>
+        <div class="status-right">
+            <div class="status-item" id="statusLines">行: 1</div>
+            <div class="status-item" id="statusSize">0 B</div>
+            <div class="status-item">UTF-8</div>
+        </div>
+    </div>
 </div>
 
 <script>
-// ===================== 状态 =====================
-const code = {
-  html: `<!DOCTYPE html>
-<html>
-<head>
-<style>
-  body {
-    display: flex; justify-content: center; align-items: center;
-    min-height: 100vh; margin: 0;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    font-family: "Microsoft YaHei", sans-serif;
-  }
-  .card {
-    background: #fff; padding: 48px 64px; border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
-    max-width: 500px;
-  }
-  h1 { color: #333; margin-bottom: 12px; font-size: 28px; }
-  p { color: #777; line-height: 1.6; margin-bottom: 20px; }
-  table {
-    width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;
-  }
-  th { background: #667eea; color: #fff; padding: 10px 14px; }
-  td { padding: 10px 14px; border-bottom: 1px solid #eee; color: #555; }
-  tr:hover td { background: #f8f8ff; }
-  .btn {
-    padding: 12px 32px; background: #667eea; color: #fff;
-    border: none; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 10px;
-  }
-  .btn:hover { background: #5a6fd6; }
-</style>
-</head>
-<body>
-  <div class="card">
-    <h1>🚀 项目概览</h1>
-    <p>这是一个代码编辑器示例，支持实时预览和多格式导出。</p>
-    <table>
-      <thead><tr><th>功能</th><th>状态</th><th>说明</th></tr></thead>
-      <tbody>
-        <tr><td>代码编辑</td><td>✅ 就绪</td><td>HTML/CSS/JS 三栏</td></tr>
-        <tr><td>实时预览</td><td>✅ 就绪</td><td>iframe 渲染</td></tr>
-        <tr><td>URL 预览</td><td>✅ 就绪</td><td>加载外部网站</td></tr>
-        <tr><td>导出 DOCX</td><td>✅ 就绪</td><td>完整章节结构</td></tr>
-        <tr><td>导出 PDF</td><td>✅ 就绪</td><td>截图转 A4</td></tr>
-        <tr><td>导出 Excel</td><td>✅ 就绪</td><td>自动提取表格</td></tr>
-      </tbody>
-    </table>
-    <button class="btn" onclick="alert('一切正常！')">测试按钮</button>
-  </div>
-</body>
-</html>`,
-  css: '', js: ''
+// ==================== 状态管理 ====================
+const state = {
+    html: '', css: '', js: '',
+    currentLang: 'html', autoPreview: true
 };
 
-let currentLang = 'html';
-let currentMode = 'code';
-let currentURL = '';
-let urlLoadTimer = null;
+const editor = document.getElementById('codeEditor');
+const previewFrame = document.getElementById('previewFrame');
+const lineNumbers = document.getElementById('lineNumbers');
 
-const editor = document.getElementById('editor');
-const preview = document.getElementById('preview');
-
-editor.value = code.html;
-updateStatus();
-setTimeout(runPreview, 150);
-
-// ===================== ✅ 修复2：智能文件命名 =====================
-/**
- * 从预览页面提取有意义的标题作为文件名
- * 优先级：<title> > <h1> > <h2> > 项目名输入框
- */
-function getSmartFileName() {
-  const projectName = document.getElementById('projectName').value.trim() || '我的项目';
-  try {
-    const d = preview.contentDocument;
-    if (!d) return projectName;
-
-    // 1. 尝试获取 <title>
-    const titleEl = d.querySelector('title');
-    if (titleEl && titleEl.textContent.trim() &&
-        titleEl.textContent.trim() !== 'document') {
-      return sanitizeFileName(titleEl.textContent.trim());
-    }
-
-    // 2. 尝试获取第一个 <h1>
-    const h1 = d.querySelector('h1');
-    if (h1 && h1.innerText.trim()) {
-      return sanitizeFileName(h1.innerText.trim());
-    }
-
-    // 3. 尝试获取第一个 <h2>
-    const h2 = d.querySelector('h2');
-    if (h2 && h2.innerText.trim()) {
-      return sanitizeFileName(h2.innerText.trim());
-    }
-  } catch(e) { /* 跨域时忽略 */ }
-
-  return projectName;
-}
-
-/** 清理文件名中的非法字符，限制长度 */
-function sanitizeFileName(name) {
-  return name
-    .replace(/[\\/:*?"<>|]/g, '')   // 移除 Windows 非法字符
-    .replace(/\s+/g, '_')           // 空格转下划线
-    .replace(/^[\.\s]+|[\.\s]+$/g, '') // 去除首尾点和空格
-    .substring(0, 50)               // 最长50字符
-    || '导出文档';
-}
-
-// 保留原 getProjectName 用于封面标题显示
-function getProjectName() {
-  return document.getElementById('projectName').value.trim() || '我的项目';
-}
-
-// ===================== 模式切换 =====================
-function switchMode(mode) {
-  currentMode = mode;
-  document.getElementById('modeCode').classList.toggle('active', mode === 'code');
-  document.getElementById('modeURL').classList.toggle('active', mode === 'url');
-  document.getElementById('editorPane').classList.toggle('url-mode', mode === 'url');
-  document.getElementById('codeTabs').classList.toggle('url-mode', mode === 'url');
-  document.getElementById('runBtn').style.display = mode === 'url' ? 'none' : '';
-  document.getElementById('modeInfo').textContent = mode === 'code' ? '代码模式' : 'URL 预览模式';
-
-  if (mode === 'url') {
-    if (currentURL) { loadURL(); }
-    else {
-      document.getElementById('urlOverlay').classList.add('show');
-      document.getElementById('previewLabelText').textContent = '网站预览';
-    }
-  } else {
-    document.getElementById('urlOverlay').classList.remove('show');
-    document.getElementById('blockedNotice').classList.remove('show');
-    document.getElementById('previewLabelText').textContent = '预览区域';
-    document.getElementById('previewUrlInfo').textContent = '';
-    runPreview();
-  }
-}
-
-// ===================== URL 预览 =====================
-function getFullURL() {
-  let val = document.getElementById('urlInput').value.trim();
-  if (!val) return '';
-  if (!/^https?:\/\//i.test(val)) val = 'https://' + val;
-  return val;
-}
-
-function loadURL() {
-  const url = getFullURL();
-  if (!url) { showMsg('请先输入网址'); return; }
-  currentURL = url;
-  switchMode('url');
-  const status = document.getElementById('urlStatus');
-  status.className = 'url-status loading';
-  document.getElementById('urlOverlay').classList.remove('show');
-  document.getElementById('blockedNotice').classList.remove('show');
-  document.getElementById('previewLabelText').textContent = '网站预览';
-  document.getElementById('previewUrlInfo').textContent = url;
-  if (urlLoadTimer) clearTimeout(urlLoadTimer);
-  preview.onload = () => {
-    status.className = 'url-status ok';
-    document.getElementById('blockedNotice').classList.remove('show');
-  };
-  preview.onerror = () => { status.className = 'url-status err'; };
-  preview.src = url;
-  urlLoadTimer = setTimeout(() => {
-    try {
-      const doc = preview.contentDocument;
-      if (doc && doc.body) status.className = 'url-status ok';
-    } catch(e) { status.className = 'url-status ok'; }
-  }, 3000);
-  setTimeout(() => {
-    try {
-      const iframeWin = preview.contentWindow;
-      if (iframeWin && iframeWin.location && iframeWin.location.href === 'about:blank') {
-        status.className = 'url-status err';
-        document.getElementById('blockedNotice').classList.add('show');
-      }
-    } catch(e) { status.className = 'url-status ok'; }
-  }, 4000);
-}
-
-function clearURL() {
-  document.getElementById('urlInput').value = '';
-  currentURL = '';
-  document.getElementById('urlStatus').className = 'url-status';
-  document.getElementById('blockedNotice').classList.remove('show');
-  if (currentMode === 'url') {
-    preview.src = 'about:blank';
-    document.getElementById('urlOverlay').classList.add('show');
-    document.getElementById('previewUrlInfo').textContent = '';
-  }
-}
-
-function openInNewTab() {
-  const url = getFullURL() || currentURL;
-  if (url) window.open(url, '_blank');
-  else showMsg('请先输入网址');
-}
-
-// ===================== 编辑器 =====================
-function switchTab(tab) {
-  code[currentLang] = editor.value;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  currentLang = tab.dataset.lang;
-  editor.value = code[currentLang];
-  updateStatus();
-}
-
-function updateStatus() {
-  document.getElementById('statusInfo').textContent =
-    `${currentLang.toUpperCase()} | ${editor.value.length} 字符`;
-}
-
-editor.addEventListener('input', () => { code[currentLang] = editor.value; updateStatus(); });
-editor.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const s = editor.selectionStart;
-    editor.value = editor.value.substring(0, s) + '  ' + editor.value.substring(editor.selectionEnd);
-    editor.selectionStart = editor.selectionEnd = s + 2;
-    code[currentLang] = editor.value;
-  }
-});
-
-// ===================== 预览 =====================
-function runPreview() {
-  if (currentMode === 'url') return;
-  code[currentLang] = editor.value;
-  const doc = preview.contentDocument;
-  doc.open(); doc.write(buildHTML()); doc.close();
-}
-
-function buildHTML() {
-  let html = code.html.trim();
-  if (html.match(/<html[\s>]/i)) {
-    if (code.css.trim()) {
-      const s = `<style>${code.css}</style>`;
-      html = html.includes('</head>') ? html.replace('</head>', s + '</head>') : s + html;
-    }
-    if (code.js.trim()) {
-      const s = `<script>${code.js}<\/script>`;
-      html = html.includes('</body>') ? html.replace('</body>', s + '</body>') : html + s;
-    }
-    return html;
-  }
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${code.css}</style></head><body>${html}<script>${code.js}<\/script></body></html>`;
-}
-
-// ===================== 工具 =====================
-function clearAll() {
-  if (currentMode === 'url') { clearURL(); return; }
-  if (!confirm('确定清空所有内容？')) return;
-  code.html = ''; code.css = ''; code.js = '';
-  editor.value = ''; updateStatus();
-  const d = preview.contentDocument; d.open(); d.write(''); d.close();
-}
-
-function copyCode() {
-  const text = currentMode === 'url' ? (getFullURL() || '') : editor.value;
-  navigator.clipboard.writeText(text)
-    .then(() => showMsg('已复制 ✓'))
-    .catch(() => { editor.select(); document.execCommand('copy'); showMsg('已复制 ✓'); });
-}
-
-function showMsg(text) {
-  const old = document.getElementById('_toast'); if (old) old.remove();
-  const d = document.createElement('div'); d.id = '_toast'; d.textContent = text;
-  Object.assign(d.style, {
-    position:'fixed', top:'16px', left:'50%', transform:'translateX(-50%)',
-    padding:'10px 24px', background:'#a6e3a1', color:'#1e1e2e', borderRadius:'8px',
-    fontWeight:'600', fontSize:'14px', zIndex:'9999', boxShadow:'0 4px 16px rgba(0,0,0,0.3)'
-  });
-  document.body.appendChild(d);
-  setTimeout(() => d.remove(), 2500);
-}
-
-function showLoading(text) {
-  document.getElementById('overlayText').textContent = text || '正在导出...';
-  document.getElementById('overlay').classList.add('show');
-}
-function hideLoading() { document.getElementById('overlay').classList.remove('show'); }
-
-function toggleMenu() { document.getElementById('exportMenu').classList.toggle('show'); }
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.export-wrap'))
-    document.getElementById('exportMenu').classList.remove('show');
-});
-
-function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ===================== 导出路由 =====================
-function doExport(type) {
-  document.getElementById('exportMenu').classList.remove('show');
-  code[currentLang] = editor.value;
-  switch(type) {
-    case 'html':         exportHTML();        break;
-    case 'pdf':          exportPDF();         break;
-    case 'doc':          exportDOC();         break;
-    case 'docx':         exportDOCX();        break;
-    case 'excel':        exportExcel();       break;
-    case 'ppt':          exportPPT();         break;
-    case 'url-html':     exportURLasHTML();   break;
-    case 'url-bookmark': exportURLBookmark(); break;
-  }
-}
-
-// ===================== URL 导出 =====================
-function exportURLasHTML() {
-  const url = getFullURL() || currentURL;
-  if (!url) { showMsg('请先在 URL 栏输入网址'); return; }
-  const name = getProjectName();
-  const fileName = getSmartFileName();
-  const now = new Date().toLocaleString('zh-CN');
-  const html = `<!DOCTYPE html>
+// ==================== 模板数据 ====================
+const templates = {
+    hello: `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${esc(name)} - 网页快照</title>
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh}
-    .header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
-    .header h1{font-size:15px;color:#cba6f7}
-    .url-bar{flex:1;display:flex;align-items:center;gap:8px;background:#313244;border:1px solid #45475a;border-radius:20px;padding:6px 14px}
-    .url-bar a{color:#89b4fa;text-decoration:none;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .open-btn{padding:6px 16px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap;text-decoration:none}
-    iframe{flex:1;width:100%;border:none}
-    .footer{padding:4px 16px;font-size:11px;color:#6c7086;background:#181825;border-top:1px solid #313244;display:flex;justify-content:space-between}
+    body { display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-family:'Segoe UI',sans-serif; }
+    .card { background:white;padding:60px 80px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center; }
+    h1 { font-size:3rem;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent; }
+    p { color:#666;font-size:1.2rem;margin-top:10px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>⚡ ${esc(name)}</h1>
-    <div class="url-bar"><span>🔗</span><a href="${esc(url)}" target="_blank">${esc(url)}</a></div>
-    <a class="open-btn" href="${esc(url)}" target="_blank">↗ 新窗口打开</a>
+  <div class="card">
+    <h1>🚀 Hello World!</h1>
+    <p>欢迎使用代码编辑器</p>
   </div>
-  <iframe src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-  <div class="footer"><span>保存自：代码编辑器 Pro</span><span>保存时间：${now}</span></div>
 </body>
-</html>`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  saveAs(blob, `${fileName}-网页.html`);
-  showMsg('跳转页 HTML 已导出 ✓');
-}
+</html>`,
 
-function exportURLBookmark() {
-  const url = getFullURL() || currentURL;
-  if (!url) { showMsg('请先在 URL 栏输入网址'); return; }
-  const fileName = getSmartFileName();
-  const content = `[InternetShortcut]\r\nURL=${url}\r\nIconIndex=0\r\n`;
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  saveAs(blob, `${fileName}.url`);
-  showMsg('书签文件已导出 ✓（双击可用浏览器打开）');
-}
+    form: `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f2f5;font-family:'Segoe UI',sans-serif}
+    .form-card{background:white;padding:40px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.1);width:420px}
+    h2{margin-bottom:24px;color:#333}
+    .form-group{margin-bottom:18px}
+    label{display:block;margin-bottom:6px;font-weight:600;color:#555;font-size:0.9rem}
+    input,select,textarea{width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:8px;font-size:0.95rem;transition:border-color 0.3s}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:#667eea}
+    .btn{width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer}
+    .btn:hover{transform:translateY(-2px)}
+  </style>
+</head>
+<body>
+  <div class="form-card">
+    <h2>📋 用户注册</h2>
+    <div class="form-group"><label>用户名</label><input type="text" placeholder="请输入用户名"></div>
+    <div class="form-group"><label>邮箱</label><input type="email" placeholder="请输入邮箱地址"></div>
+    <div class="form-group"><label>角色</label><select><option>开发者</option><option>设计师</option><option>产品经理</option></select></div>
+    <div class="form-group"><label>简介</label><textarea rows="3" placeholder="简单介绍一下自己"></textarea></div>
+    <button class="btn" onclick="alert('注册成功！')">提交注册</button>
+  </div>
+</body>
+</html>`,
 
-// ===================== 导出 HTML =====================
-function exportHTML() {
-  if (currentMode === 'url') { exportURLasHTML(); return; }
-  const fileName = getSmartFileName();
-  const blob = new Blob([buildHTML()], { type: 'text/html;charset=utf-8' });
-  saveAs(blob, fileName + '.html');
-  showMsg('HTML 已导出 ✓');
-}
+    card: `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#1a1a2e;padding:40px;font-family:'Segoe UI',sans-serif}
+    h1{text-align:center;color:white;margin-bottom:30px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;max-width:1000px;margin:0 auto}
+    .card{background:#16213e;border-radius:16px;padding:30px;border:1px solid #2a2a4a;transition:all 0.3s}
+    .card:hover{transform:translateY(-8px);border-color:#6c63ff;box-shadow:0 12px 40px rgba(108,99,255,0.2)}
+    .card-icon{font-size:2.5rem;margin-bottom:16px}
+    .card h3{color:#e8e8f0;margin-bottom:10px}
+    .card p{color:#a0a0c0;line-height:1.6;font-size:0.92rem}
+    .tag{display:inline-block;padding:4px 12px;background:rgba(108,99,255,0.15);color:#6c63ff;border-radius:20px;font-size:0.78rem;margin-top:14px}
+  </style>
+</head>
+<body>
+  <h1>🎨 项目展示</h1>
+  <div class="grid">
+    <div class="card"><div class="card-icon">🚀</div><h3>高性能引擎</h3><p>基于 WebAssembly 的高性能计算引擎，提供毫秒级响应速度。</p><span class="tag">性能优化</span></div>
+    <div class="card"><div class="card-icon">🎯</div><h3>智能分析</h3><p>AI 驱动的数据分析平台，自动发现数据中的关键模式和趋势。</p><span class="tag">AI / ML</span></div>
+    <div class="card"><div class="card-icon">🔒</div><h3>安全防护</h3><p>端到端加密通信方案，确保数据传输和存储的绝对安全。</p><span class="tag">安全</span></div>
+  </div>
+</body>
+</html>`,
 
-// ===================== 导出 PDF =====================
-function exportPDF() {
-  showLoading('正在生成 PDF...');
-  capturePreview(1200, null).then(canvas => {
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pw = 210, margin = 10, usableW = pw - margin * 2;
-    const imgH = (canvas.height * usableW) / canvas.width;
-    let srcY = 0;
-    const usableH = 297 - margin * 2;
-    const pageHeightPx = (usableH / imgH) * canvas.height;
-    let page = 0;
-    while (srcY < canvas.height) {
-      if (page > 0) pdf.addPage();
-      const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
-      const tmp = document.createElement('canvas');
-      tmp.width = canvas.width; tmp.height = sliceH;
-      tmp.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(tmp.toDataURL('image/png'), 'PNG', margin, margin, usableW, (sliceH * usableW) / canvas.width);
-      srcY += pageHeightPx; page++;
+    dashboard: `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0f0f1a;color:#e8e8f0;font-family:'Segoe UI',sans-serif;padding:24px}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .header h1{font-size:1.5rem}
+    .header span{color:#a0a0c0;font-size:0.9rem}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat-card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:20px}
+    .stat-card .label{color:#a0a0c0;font-size:0.82rem;margin-bottom:8px}
+    .stat-card .value{font-size:1.8rem;font-weight:800}
+    .stat-card .change{font-size:0.8rem;margin-top:6px}
+    .stat-card .change.up{color:#43e97b}
+    .stat-card .change.down{color:#ff6584}
+    .chart-area{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:24px;margin-bottom:16px}
+    .chart-area h3{margin-bottom:16px;font-size:1rem}
+    .bar-chart{display:flex;align-items:flex-end;gap:12px;height:160px}
+    .bar-wrapper{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .bar{width:100%;border-radius:6px 6px 0 0}
+    .bar-label{font-size:0.75rem;color:#a0a0c0}
+    .table-area{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:24px}
+    .table-area h3{margin-bottom:16px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #2a2a4a;font-size:0.88rem}
+    th{color:#a0a0c0;font-weight:600}
+    .badge{padding:3px 10px;border-radius:12px;font-size:0.75rem}
+    .badge-green{background:rgba(67,233,123,0.15);color:#43e97b}
+    .badge-yellow{background:rgba(255,193,7,0.15);color:#ffc107}
+    .badge-red{background:rgba(255,101,132,0.15);color:#ff6584}
+  </style>
+</head>
+<body>
+  <div class="header"><h1>📊 数据仪表盘</h1><span>最后更新: 2026-03-02</span></div>
+  <div class="stats">
+    <div class="stat-card"><div class="label">总用户数</div><div class="value" style="color:#6c63ff">24,521</div><div class="change up">↑ 12.5%</div></div>
+    <div class="stat-card"><div class="label">活跃用户</div><div class="value" style="color:#43e97b">8,432</div><div class="change up">↑ 8.2%</div></div>
+    <div class="stat-card"><div class="label">总收入</div><div class="value" style="color:#ffc107">¥1.2M</div><div class="change up">↑ 23.1%</div></div>
+    <div class="stat-card"><div class="label">跳出率</div><div class="value" style="color:#ff6584">32.1%</div><div class="change down">↓ 3.2%</div></div>
+  </div>
+  <div class="chart-area">
+    <h3>📈 月度趋势</h3>
+    <div class="bar-chart">
+      <div class="bar-wrapper"><div class="bar" style="height:60%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">1月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:45%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">2月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:75%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">3月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:55%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">4月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:85%;background:linear-gradient(180deg,#43e97b,#38f9d7)"></div><div class="bar-label">5月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:70%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">6月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:90%;background:linear-gradient(180deg,#43e97b,#38f9d7)"></div><div class="bar-label">7月</div></div>
+      <div class="bar-wrapper"><div class="bar" style="height:65%;background:linear-gradient(180deg,#6c63ff,#8b7aff)"></div><div class="bar-label">8月</div></div>
+    </div>
+  </div>
+  <div class="table-area">
+    <h3>📋 最近订单</h3>
+    <table>
+      <thead><tr><th>订单号</th><th>客户</th><th>金额</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>#20261001</td><td>张三</td><td>¥2,340</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>#20261002</td><td>李四</td><td>¥5,120</td><td><span class="badge badge-yellow">处理中</span></td></tr>
+        <tr><td>#20261003</td><td>王五</td><td>¥890</td><td><span class="badge badge-green">已完成</span></td></tr>
+        <tr><td>#20261004</td><td>赵六</td><td>¥3,670</td><td><span class="badge badge-red">已取消</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>`,
+
+    table: `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#f8f9fa;font-family:'Segoe UI',sans-serif;padding:40px}
+    .container{max-width:900px;margin:0 auto;background:white;border-radius:16px;box-shadow:0 2px 20px rgba(0,0,0,0.08);overflow:hidden}
+    .table-header{padding:24px 30px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+    .table-header h2{font-size:1.3rem;color:#333}
+    .search-box{padding:8px 16px;border:2px solid #e0e0e0;border-radius:8px;font-size:0.9rem;width:240px}
+    .search-box:focus{outline:none;border-color:#667eea}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f8f9fa;padding:14px 20px;text-align:left;font-size:0.82rem;color:#888;text-transform:uppercase;letter-spacing:0.5px}
+    td{padding:16px 20px;border-bottom:1px solid #f0f0f0;font-size:0.92rem;color:#444}
+    tr:hover td{background:#f8f9ff}
+    .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.9rem;color:white;font-weight:700}
+    .user-cell{display:flex;align-items:center;gap:12px}
+    .status{padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:600}
+    .active{background:#e8f5e9;color:#2e7d32}
+    .inactive{background:#fce4ec;color:#c62828}
+    .pending{background:#fff3e0;color:#e65100}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="table-header"><h2>👥 用户管理</h2><input class="search-box" placeholder="🔍 搜索用户..."></div>
+    <table>
+      <thead><tr><th>用户</th><th>邮箱</th><th>角色</th><th>状态</th><th>注册日期</th></tr></thead>
+      <tbody>
+        <tr><td><div class="user-cell"><div class="avatar" style="background:#667eea">张</div>张伟</div></td><td>zhang@example.com</td><td>管理员</td><td><span class="status active">活跃</span></td><td>2025-12-01</td></tr>
+        <tr><td><div class="user-cell"><div class="avatar" style="background:#43e97b">李</div>李娜</div></td><td>li@example.com</td><td>编辑</td><td><span class="status active">活跃</span></td><td>2025-12-15</td></tr>
+        <tr><td><div class="user-cell"><div class="avatar" style="background:#ff6584">王</div>王磊</div></td><td>wang@example.com</td><td>用户</td><td><span class="status pending">待审核</span></td><td>2026-01-08</td></tr>
+        <tr><td><div class="user-cell"><div class="avatar" style="background:#ffc107">赵</div>赵敏</div></td><td>zhao@example.com</td><td>用户</td><td><span class="status inactive">已停用</span></td><td>2026-02-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>`,
+
+    animation: `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{display:flex;justify-content:center;align-items:center;min-height:100vh;background:#0f0f1a;font-family:'Segoe UI',sans-serif;overflow:hidden}
+    .scene{position:relative;width:300px;height:300px}
+    .ring{position:absolute;top:50%;left:50%;border:3px solid transparent;border-radius:50%;animation:rotate 3s linear infinite}
+    .ring:nth-child(1){width:200px;height:200px;margin:-100px 0 0 -100px;border-top-color:#6c63ff;animation-duration:3s}
+    .ring:nth-child(2){width:160px;height:160px;margin:-80px 0 0 -80px;border-right-color:#ff6584;animation-duration:2.5s;animation-direction:reverse}
+    .ring:nth-child(3){width:120px;height:120px;margin:-60px 0 0 -60px;border-bottom-color:#43e97b;animation-duration:2s}
+    .ring:nth-child(4){width:80px;height:80px;margin:-40px 0 0 -40px;border-left-color:#ffc107;animation-duration:1.5s;animation-direction:reverse}
+    .center-dot{position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;background:white;border-radius:50%;animation:glow 2s ease-in-out infinite alternate}
+    @keyframes rotate{to{transform:rotate(360deg)}}
+    @keyframes glow{from{box-shadow:0 0 10px rgba(255,255,255,0.5)}to{box-shadow:0 0 30px rgba(108,99,255,0.8),0 0 60px rgba(255,101,132,0.4)}}
+    .title{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:white;font-size:1.2rem;font-weight:700;letter-spacing:4px;text-transform:uppercase;opacity:0.8}
+    .particles{position:absolute;width:100%;height:100%}
+    .particle{position:absolute;width:4px;height:4px;background:rgba(108,99,255,0.6);border-radius:50%;animation:drift 6s linear infinite}
+    @keyframes drift{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(-100vh) scale(1);opacity:0}}
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+  <div class="scene">
+    <div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    <div class="center-dot"></div>
+  </div>
+  <div class="title">CSS Animation</div>
+  <script>
+    const container = document.getElementById('particles');
+    for(let i=0;i<30;i++){
+      const p=document.createElement('div');p.className='particle';
+      p.style.left=Math.random()*100+'%';
+      p.style.animationDelay=Math.random()*6+'s';
+      p.style.animationDuration=(4+Math.random()*4)+'s';
+      p.style.background=['rgba(108,99,255,0.6)','rgba(255,101,132,0.6)','rgba(67,233,123,0.6)'][Math.floor(Math.random()*3)];
+      container.appendChild(p);
     }
-    const fileName = getSmartFileName();
-    pdf.save(fileName + '.pdf');
-    hideLoading(); showMsg('PDF 已导出 ✓');
-  }).catch(err => { hideLoading(); showMsg('PDF 导出失败: ' + err.message); });
+  <\/script>
+</body>
+</html>`
+};
+
+// ==================== 初始化 ====================
+window.addEventListener('DOMContentLoaded', () => { loadTemplate('hello'); });
+
+document.addEventListener('click', (e) => {
+    const dropdown = document.querySelector('.export-dropdown');
+    if (!dropdown.contains(e.target)) {
+        document.getElementById('exportMenu').classList.remove('show');
+    }
+});
+
+// ==================== 编辑器功能 ====================
+function switchLang(btn) {
+    state[state.currentLang] = editor.value;
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.currentLang = btn.dataset.lang;
+    editor.value = state[state.currentLang];
+    document.getElementById('editorLabel').textContent = `编辑器 — ${state.currentLang.toUpperCase()}`;
+    document.getElementById('statusLang').textContent = state.currentLang.toUpperCase();
+    updateLineNumbers();
+    updateStats();
 }
 
-// ===================== 导出 DOC =====================
-function exportDOC() {
-  showLoading('正在生成 Word 兼容版 (.doc)...');
-  setTimeout(() => {
-    try {
-      const name = getProjectName();
-      const fileName = getSmartFileName();
-      const nowStr = new Date().toLocaleString('zh-CN');
-      const tableData = extractTablesFromPreview();
-      const previewTxt = extractTextFromPreview();
-      let tablesHTML = '';
-      if (tableData.length > 0) {
-        tableData.forEach((tbl, idx) => {
-          tablesHTML += `<h2>表格 ${idx + 1}</h2>`;
-          tablesHTML += '<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:11pt;">';
-          tbl.forEach((row, ri) => {
-            tablesHTML += '<tr>';
-            row.forEach(cell => {
-              if (ri === 0) tablesHTML += `<th style="background:#4A56E2;color:#fff;padding:8px 12px;">${esc(cell)}</th>`;
-              else tablesHTML += `<td style="padding:6px 12px;border:1px solid #ccc;">${esc(cell)}</td>`;
-            });
-            tablesHTML += '</tr>';
-          });
-          tablesHTML += '</table><br>';
+function onEditorInput() {
+    updateLineNumbers();
+    updateStats();
+    state[state.currentLang] = editor.value;
+    if (state.autoPreview) {
+        clearTimeout(window._previewTimer);
+        window._previewTimer = setTimeout(runPreview, 600);
+    }
+}
+
+function updateLineNumbers() {
+    const lines = editor.value.split('\n').length;
+    lineNumbers.innerHTML = Array.from({ length: lines }, (_, i) => i + 1).join('<br>');
+    document.getElementById('statusLines').textContent = `行: ${lines}`;
+}
+
+function updateStats() {
+    const text = editor.value;
+    const bytes = new Blob([text]).size;
+    document.getElementById('charCount').textContent = `${text.length} 字符`;
+    document.getElementById('statusSize').textContent = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function syncScroll() { lineNumbers.scrollTop = editor.scrollTop; }
+
+function handleTab(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        onEditorInput();
+    }
+}
+
+// ==================== 预览功能 ====================
+function runPreview() {
+    state[state.currentLang] = editor.value;
+    const combinedHTML = buildFullHTML();
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    doc.open(); doc.write(combinedHTML); doc.close();
+}
+
+function refreshPreview() { runPreview(); showToast('预览已刷新', 'success'); }
+
+function buildFullHTML() {
+    const htmlContent = state.html.trim();
+    if (htmlContent.toLowerCase().includes('<!doctype') || htmlContent.toLowerCase().includes('<html')) {
+        let result = htmlContent;
+        if (state.css.trim()) result = result.replace('</head>', `<style>\n${state.css}\n</style>\n</head>`);
+        if (state.js.trim()) result = result.replace('</body>', `<script>\n${state.js}\n<\/script>\n</body>`);
+        return result;
+    }
+    return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><style>${state.css}</style></head><body>${state.html}<script>${state.js}<\/script></body></html>`;
+}
+
+// ==================== 工具功能 ====================
+function clearEditor() {
+    if (confirm('确定要清空所有编辑器内容吗？')) {
+        state.html = ''; state.css = ''; state.js = '';
+        editor.value = '';
+        updateLineNumbers(); updateStats();
+        const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+        doc.open(); doc.write(''); doc.close();
+        showToast('编辑器已清空', 'info');
+    }
+}
+
+function copyCode() {
+    navigator.clipboard.writeText(editor.value).then(() => {
+        showToast('代码已复制到剪贴板', 'success');
+    }).catch(() => {
+        editor.select();
+        document.execCommand('copy');
+        showToast('代码已复制', 'success');
+    });
+}
+
+function formatCode() {
+    let code = editor.value;
+    if (state.currentLang === 'html') {
+        code = code.replace(/></g, '>\n<');
+        let indent = 0;
+        const lines = code.split('\n');
+        const formatted = lines.map(line => {
+            line = line.trim();
+            if (line.match(/^<\/(.*?)>/)) indent = Math.max(0, indent - 1);
+            const result = '  '.repeat(indent) + line;
+            if (line.match(/^<[^/!].*[^/]>$/) && !line.match(/^<(img|br|hr|input|meta|link)/i)) indent++;
+            return result;
         });
-      }
-      let codeHTML = '';
-      const codeMap = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
-      for (const [lang, label] of Object.entries(codeMap)) {
-        if (code[lang].trim()) {
-          codeHTML += `<h2>${label} 代码</h2>`;
-          codeHTML += `<pre style="background:#f5f5f5;padding:12px;font-family:Consolas,monospace;font-size:9pt;border:1px solid #ddd;white-space:pre-wrap;word-break:break-all;">${esc(code[lang])}</pre>`;
-        }
-      }
-      const docContent = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
-          xmlns:w="urn:schemas-microsoft-com:office:word"
-          xmlns="http://www.w3.org/TR/REC-html40">
-        <head><meta charset="UTF-8"><title>${esc(name)}</title>
-        <style>
-          @page WordSection1{size:21cm 29.7cm;margin:2.54cm 3.17cm 2.54cm 3.17cm;}
-          body{font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:12pt;color:#333;}
-          h1{font-size:22pt;color:#4A56E2;font-weight:bold;margin:24pt 0 12pt;border-bottom:2px solid #4A56E2;padding-bottom:6pt;}
-          h2{font-size:14pt;color:#333;font-weight:bold;margin:18pt 0 8pt;}
-          p{font-size:11pt;line-height:1.8;margin:6pt 0;}
-          .cover{text-align:center;padding:80pt 0 60pt;page-break-after:always;}
-          .cover-title{font-size:36pt;font-weight:bold;color:#4A56E2;display:block;margin-bottom:16pt;}
-          table{border-collapse:collapse;width:100%;margin:10pt 0;font-size:10.5pt;}
-          th{background:#4A56E2;color:#fff;padding:8px 12px;font-weight:bold;}
-          td{padding:6px 12px;border:1px solid #ccc;color:#444;}
-          pre{background:#f5f5f5;border:1px solid #ddd;padding:10pt 12pt;font-family:Consolas,monospace;font-size:9pt;white-space:pre-wrap;word-break:break-all;}
-        </style></head><body>
-        <div class="cover">
-          <span class="cover-title">${esc(name)}</span>
-          <span style="font-size:16pt;color:#888;display:block;margin-bottom:10pt;">代码编辑器导出文档</span>
-          <span style="font-size:11pt;color:#aaa;">导出时间：${nowStr}</span>
-        </div>
-        <h1>第一章 项目概述</h1>
-        <p>文档生成时间：${nowStr}</p>
-        ${previewTxt.trim() ? `<h1>第二章 页面内容</h1><p>${esc(previewTxt.substring(0,3000)).replace(/\n/g,'</p><p>')}</p>` : ''}
-        ${tableData.length > 0 ? `<h1>数据表格</h1>${tablesHTML}` : ''}
-        <h1>源代码</h1>${codeHTML}
-        <div style="font-size:9pt;color:#aaa;text-align:center;margin-top:40pt;border-top:1px solid #eee;padding-top:8pt;">— 代码编辑器自动导出 · ${nowStr} —</div>
-        </body></html>`;
-      const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword' });
-      saveAs(blob, `${fileName}.doc`);
-      hideLoading(); showMsg('Word (.doc) 已导出 ✓');
-    } catch(err) { hideLoading(); showMsg('DOC 导出失败: ' + err.message); }
-  }, 200);
+        code = formatted.join('\n');
+    }
+    editor.value = code;
+    onEditorInput();
+    showToast('代码已格式化', 'success');
 }
 
-// ===================== ✅ 修复3：导出 DOCX（完整重写）=====================
-async function exportDOCX() {
-  showLoading('正在生成 Word 文档...');
-  try {
-    // ✅ 修复：正确从 window.docx 解构，docx v7 API
-    const {
-      Document, Packer, Paragraph, TextRun, HeadingLevel,
-      Table, TableRow, TableCell, WidthType, AlignmentType,
-      ImageRun, ShadingType, BorderStyle
-    } = window.docx;
-
-    const name = getProjectName();
-    const fileName = getSmartFileName();
-    const now = new Date().toLocaleString('zh-CN');
-
-    // ✅ 修复：截图转 ArrayBuffer（v7 ImageRun 需要 ArrayBuffer）
-    let imgArrayBuffer = null;
-    let imgWidth = 500, imgHeight = 350;
-    try {
-      const canvas = await capturePreview(1200, null);
-      const base64 = canvas.toDataURL('image/png').split(',')[1];
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      imgArrayBuffer = bytes.buffer; // ✅ 必须是 ArrayBuffer
-      // 等比缩放到最大宽度 500pt（Word 内容区约 500pt）
-      const ratio = canvas.height / canvas.width;
-      imgWidth = 500;
-      imgHeight = Math.min(Math.round(imgWidth * ratio), 650);
-    } catch(e) {
-      console.warn('截图失败，跳过图片:', e);
+function loadTemplate(name) {
+    if (templates[name]) {
+        state.html = templates[name]; state.css = ''; state.js = '';
+        document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('.lang-btn[data-lang="html"]').classList.add('active');
+        state.currentLang = 'html';
+        document.getElementById('editorLabel').textContent = '编辑器 — HTML';
+        document.getElementById('statusLang').textContent = 'HTML';
+        editor.value = state.html;
+        updateLineNumbers(); updateStats(); runPreview();
+        showToast(`已加载模板: ${name}`, 'success');
     }
+}
 
-    const tableData = extractTablesFromPreview();
-    const previewText = extractTextFromPreview();
+// ==================== 导出功能 ====================
+function toggleExportMenu() { document.getElementById('exportMenu').classList.toggle('show'); }
+function closeExportMenu() { document.getElementById('exportMenu').classList.remove('show'); }
+function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+// ---- 导出 HTML ----
+function exportHTML() {
+    closeExportMenu();
+    state[state.currentLang] = editor.value;
+    const content = buildFullHTML();
+    const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+    saveAs(blob, 'exported.html');
+    showToast('HTML 文件已导出', 'success');
+}
+
+// ---- 导出 PDF ----
+function exportPDF() {
+    closeExportMenu();
+    showLoading();
+    showToast('正在生成 PDF，请稍候...', 'info');
+
+    const iframe = document.getElementById('previewFrame');
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+    html2canvas(iframeDoc.body, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: iframeDoc.body.scrollWidth,
+        height: iframeDoc.body.scrollHeight
+    }).then(canvas => {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const imgData = canvas.toDataURL('image/png');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * pageWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+        pdf.save('exported.pdf');
+        hideLoading();
+        showToast('PDF 已成功导出', 'success');
+    }).catch(err => {
+        hideLoading();
+        showToast('PDF 导出失败: ' + err.message, 'error');
+    });
+}
+
+// ==================== Word 导出（核心优化部分）====================
+
+/**
+ * 打开 Word 导出配置弹窗
+ */
+function exportWord() {
+    closeExportMenu();
+    // 自动填充标题（从 HTML 中提取 <title> 或 <h1>）
+    const titleMatch = state.html.match(/<title[^>]*>(.*?)<\/title>/i)
+        || state.html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    if (titleMatch) {
+        const rawTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+        if (rawTitle) document.getElementById('wordTitle').value = rawTitle;
+    }
+    document.getElementById('wordModal').classList.add('active');
+}
+
+function closeWordModal() {
+    document.getElementById('wordModal').classList.remove('active');
+}
+
+/**
+ * 将 HTML 字符串解析为 docx 段落数组
+ * 支持：h1~h6、p、ul/ol/li、table、pre/code、blockquote、hr、br、strong/em/u/a
+ */
+function htmlToDocxChildren(htmlString) {
+    const {
+        Document, Paragraph, TextRun, HeadingLevel,
+        Table, TableRow, TableCell, WidthType,
+        BorderStyle, AlignmentType, UnderlineType,
+        ShadingType, convertInchesToTwip, PageBreak,
+        HorizontalPositionAlign
+    } = docx;
+
+    // 用临时 DOM 解析 HTML
+    const parser = new DOMParser();
+    const dom = parser.parseFromString(htmlString, 'text/html');
+    const body = dom.body;
+
     const children = [];
 
-    // ---------- 封面 ----------
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 1200, after: 400 },
-        children: [new TextRun({
-          text: name, bold: true, size: 64,
-          color: '4A56E2', font: { name: 'Microsoft YaHei' }
-        })]
-      }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-        children: [new TextRun({
-          text: '代码编辑器 Pro · 导出文档',
-          size: 32, color: '888888', font: { name: 'Microsoft YaHei' }
-        })]
-      }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 1200 },
-        children: [new TextRun({
-          text: `导出时间：${now}`,
-          size: 22, color: 'AAAAAA', font: { name: 'Microsoft YaHei' }
-        })]
-      })
-    );
-
-    // ---------- 辅助函数 ----------
-    const mkH1 = (text) => new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 480, after: 200 },
-      children: [new TextRun({
-        text, bold: true, size: 36,
-        color: '4A56E2', font: { name: 'Microsoft YaHei' }
-      })]
-    });
-    const mkH2 = (text) => new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 320, after: 160 },
-      children: [new TextRun({
-        text, bold: true, size: 28,
-        color: '333333', font: { name: 'Microsoft YaHei' }
-      })]
-    });
-    const mkP = (text) => new Paragraph({
-      spacing: { before: 100, after: 100 },
-      children: [new TextRun({
-        text: String(text), size: 22,
-        color: '444444', font: { name: 'Microsoft YaHei' }
-      })]
-    });
-    const mkEmpty = () => new Paragraph({ children: [] });
-
-    // ---------- 第一章：概述 ----------
-    children.push(
-      mkH1('第一章  项目概述'),
-      mkP(`项目名称：${name}`),
-      mkP(`文档生成时间：${now}`),
-      mkP('本文档由代码编辑器 Pro 自动生成，包含页面预览截图、数据表格及完整源代码。'),
-      mkEmpty()
-    );
-
-    // ---------- 第二章：预览效果 ----------
-    children.push(mkH1('第二章  预览效果'));
-
-    if (imgArrayBuffer) {
-      children.push(
-        mkP('以下为页面预览截图：'),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 200 },
-          children: [
-            // ✅ 修复：v7 ImageRun API —— data 传 ArrayBuffer，transformation 用 pt 单位
-            new ImageRun({
-              data: imgArrayBuffer,
-              transformation: { width: imgWidth, height: imgHeight }
-            })
-          ]
-        })
-      );
-    } else {
-      children.push(mkP('（截图生成失败，请在浏览器中查看预览效果）'));
-    }
-
-    if (previewText.trim()) {
-      children.push(
-        mkH2('2.1  页面文本内容'),
-        ...previewText.substring(0, 2000).split('\n')
-          .filter(l => l.trim())
-          .map(l => mkP(l)),
-        mkEmpty()
-      );
-    }
-
-    // ---------- 第三章：数据表格（可选）----------
-    let chapterOffset = 3;
-    if (tableData.length > 0) {
-      children.push(
-        mkH1(`第三章  数据表格`),
-        mkP(`页面中共检测到 ${tableData.length} 个表格：`),
-        mkEmpty()
-      );
-      tableData.forEach((tbl, idx) => {
-        children.push(mkH2(`3.${idx + 1}  表格 ${idx + 1}`));
-        if (tbl.length > 0) {
-          const colCount = Math.max(...tbl.map(r => r.length));
-          const colWidth = Math.floor(9000 / colCount); // 总宽约9000 twips
-          children.push(
-            new Table({
-              width: { size: 9000, type: WidthType.DXA },
-              rows: tbl.map((row, ri) =>
-                new TableRow({
-                  children: row.map(cell =>
-                    new TableCell({
-                      width: { size: colWidth, type: WidthType.DXA },
-                      // ✅ 修复：v7 shading API
-                      shading: ri === 0
-                        ? { type: ShadingType.SOLID, color: '4A56E2', fill: '4A56E2' }
-                        : { type: ShadingType.CLEAR, color: 'auto', fill: ri % 2 === 0 ? 'F0F4FF' : 'FFFFFF' },
-                      children: [new Paragraph({
-                        children: [new TextRun({
-                          text: String(cell || ''),
-                          bold: ri === 0,
-                          color: ri === 0 ? 'FFFFFF' : '333333',
-                          size: 20,
-                          font: { name: 'Microsoft YaHei' }
-                        })]
-                      })]
-                    })
-                  )
-                })
-              )
-            }),
-            mkEmpty()
-          );
-        }
-      });
-      chapterOffset = 4;
-    }
-
-    // ---------- 第N章：源代码 ----------
-    const chN = chapterOffset;
-    const chLabel = ['一','二','三','四','五'][chN - 1] || String(chN);
-    children.push(
-      mkH1(`第${chLabel}章  源代码`),
-      mkP('以下为编辑器中的完整源代码内容。'),
-      mkEmpty()
-    );
-
-    const codeMap = [
-      { key: 'html', label: 'HTML' },
-      { key: 'css',  label: 'CSS' },
-      { key: 'js',   label: 'JavaScript' }
-    ];
-    let secIdx = 1;
-    for (const { key, label } of codeMap) {
-      if (!code[key].trim()) continue;
-      children.push(mkH2(`${chN}.${secIdx}  ${label} 代码`));
-      // ✅ 每行代码单独一个段落，使用等宽字体 + 浅灰背景
-      const lines = code[key].split('\n');
-      for (const line of lines) {
-        children.push(new Paragraph({
-          spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' },
-          shading: { type: ShadingType.SOLID, color: 'F5F5F5', fill: 'F5F5F5' },
-          children: [new TextRun({
-            text: line === '' ? ' ' : line,  // 空行用空格占位
-            font: { name: 'Courier New' },
-            size: 18,
-            color: '2D2D2D'
-          })]
-        }));
-      }
-      children.push(mkEmpty());
-      secIdx++;
-    }
-
-    // ---------- 附录 ----------
-    children.push(
-      mkH1('附录'),
-      mkP(`项目名称：${name}`),
-      mkP(`导出工具：代码编辑器 Pro`),
-      mkP(`生成时间：${now}`)
-    );
-
-    // ---------- 构建文档 ----------
-    const doc = new Document({
-      creator: '代码编辑器 Pro',
-      title: name,
-      description: `由代码编辑器 Pro 导出于 ${now}`,
-      sections: [{
-        properties: {
-          page: {
-            margin: { top: 1440, bottom: 1440, left: 1800, right: 1800 }
-          }
-        },
-        children
-      }]
-    });
-
-    // ✅ 修复：Packer.toBlob 是异步的，正确 await
-    const blob = await Packer.toBlob(doc);
-    saveAs(blob, `${fileName}.docx`);
-    hideLoading();
-    showMsg('Word (.docx) 已导出 ✓');
-
-  } catch(err) {
-    hideLoading();
-    console.error('DOCX 导出错误:', err);
-    showMsg('导出失败: ' + err.message);
-  }
-}
-
-// ===================== 导出 Excel =====================
-function exportExcel() {
-  showLoading('正在生成 Excel...');
-  setTimeout(() => {
-    const wb = XLSX.utils.book_new();
-    const tableData = extractTablesFromPreview();
-    const fileName = getSmartFileName();
-    if (tableData.length > 0) {
-      tableData.forEach((tbl, i) => {
-        const ws = XLSX.utils.aoa_to_sheet(tbl);
-        XLSX.utils.book_append_sheet(wb, ws, `表格${i+1}`);
-      });
-    }
-    const codeRows = [['语言', '代码内容']];
-    if (code.html.trim()) codeRows.push(['HTML', code.html]);
-    if (code.css.trim())  codeRows.push(['CSS',  code.css]);
-    if (code.js.trim())   codeRows.push(['JavaScript', code.js]);
-    const ws = XLSX.utils.aoa_to_sheet(codeRows);
-    ws['!cols'] = [{ wch: 12 }, { wch: 120 }];
-    XLSX.utils.book_append_sheet(wb, ws, '源代码');
-    XLSX.writeFile(wb, fileName + '.xlsx');
-    hideLoading(); showMsg('Excel 已导出 ✓');
-  }, 200);
-}
-
-// ===================== 导出 PPT =====================
-function exportPPT() {
-  showLoading('正在生成 PPT...');
-  capturePreview(1280, 720).then(canvas => {
-    const imgData = canvas.toDataURL('image/png');
-    const fileName = getSmartFileName();
-    const pptHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
-        xmlns:p="urn:schemas-microsoft-com:office:powerpoint"
-        xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="UTF-8">
-      <style>
-        @page{size:25.4cm 19.05cm;margin:0}
-        .slide{page-break-after:always;width:25.4cm;height:19.05cm;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:2cm}
-        h1{font-size:32pt;color:#333;margin-bottom:16px;font-family:'Microsoft YaHei'}
-        img{max-width:88%;max-height:68%;object-fit:contain;border:1px solid #ddd;border-radius:8px}
-        pre{font-size:8pt;background:#f5f5f5;padding:14px;border-radius:6px;max-width:92%;overflow:hidden;font-family:Consolas;white-space:pre-wrap;text-align:left}
-      </style></head><body>
-      <div class="slide" style="background:linear-gradient(135deg,#667eea,#764ba2)">
-        <h1 style="color:#fff;font-size:40pt">${esc(getProjectName())}</h1>
-        <p style="color:rgba(255,255,255,0.8);font-family:'Microsoft YaHei';font-size:14pt">${new Date().toLocaleString('zh-CN')}</p>
-      </div>
-      <div class="slide"><h1>预览效果</h1><img src="${imgData}"></div>
-      <div class="slide"><h1 style="font-size:22pt;align-self:flex-start">HTML 源代码</h1>
-        <pre>${esc(code.html.substring(0,2500))}</pre></div>
-      </body></html>`;
-    const blob = new Blob(['\ufeff' + pptHTML], { type: 'application/vnd.ms-powerpoint' });
-    saveAs(blob, fileName + '.ppt');
-    hideLoading(); showMsg('PPT 已导出 ✓');
-  }).catch(err => { hideLoading(); showMsg('PPT 导出失败: ' + err.message); });
-}
-
-// ===================== 公共工具 =====================
-function capturePreview(w, h) {
-  return new Promise((resolve, reject) => {
-    const tmp = document.createElement('iframe');
-    tmp.style.cssText = `position:fixed;left:-9999px;width:${w}px;height:${h||900}px;border:none;`;
-    document.body.appendChild(tmp);
-    const d = tmp.contentDocument;
-    d.open(); d.write(buildHTML()); d.close();
-    const done = () => {
-      setTimeout(() => {
-        html2canvas(d.body, {
-          scale: 2, useCORS        html2canvas(d.body, {
-          scale: 2, useCORS: true, width: w,
-          height: h || d.body.scrollHeight || 900,
-          backgroundColor: '#ffffff'
-        })
-        .then(canvas => { document.body.removeChild(tmp); resolve(canvas); })
-        .catch(err => { document.body.removeChild(tmp); reject(err); });
-      }, 400);
-    };
-    tmp.onload = done;
-    setTimeout(done, 1500);
-  });
-}
-
-function extractTablesFromPreview() {
-  try {
-    const d = preview.contentDocument;
-    if (!d) return [];
-    const result = [];
-    d.querySelectorAll('table').forEach(table => {
-      const rows = [];
-      table.querySelectorAll('tr').forEach(tr => {
-        const cells = [];
-        tr.querySelectorAll('th, td').forEach(cell => cells.push(cell.innerText.trim()));
-        if (cells.length) rows.push(cells);
-      });
-      if (rows.length) result.push(rows);
-    });
-    return result;
-  } catch(e) { return []; }
-}
-
-function extractTextFromPreview() {
-  try {
-    const d = preview.contentDocument;
-    return d ? (d.body.innerText || '').trim() : '';
-  } catch(e) { return ''; }
-}
-</script>
-</body>
-</html>
+    // 颜色映射（将常见颜色名转为 hex）
+    const colorMap = {
+        'red':'FF0000','green':'008000','blue':'0000FF','white':'FFFFFF',
+        'black':'000000','gray':'808080','grey':'808080','orange':'FFA500',
+        'purple':'800080','yellow':'FFFF00','pink':'FFC0CB','brown':'A52A2A',
+        'cyan':'00FFFF','magenta':'FF00FF','lime':'00FF00','navy':'000080',
+        'teal':'008080','silver':'C0C0C0','
